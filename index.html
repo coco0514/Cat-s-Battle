@@ -1,0 +1,1376 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>ネコのケンカ</title>
+<style>
+:root{
+  --bg:#FFF6E9; --surface:#FFFFFF; --surface2:#FFF0D6; --ink:#33261F; --muted:#7A675C;
+  --line:#E8D5BE; --accent:#D9483B; --accent-ink:#fff; --teal:#177E6C; --teal-bg:#DFF5EE;
+  --gold:#E9A426; --cost:#1E9E57; --pow:#D9483B; --shadow:0 4px 14px rgba(80,50,20,.10);
+  --card-bg:#FFFCF5;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#1E1A17; --surface:#2B2521; --surface2:#3A2F28; --ink:#F5EAD9; --muted:#C4B09E;
+  --line:#4A3E35; --accent:#FF6B5B; --teal:#3EC9AE; --teal-bg:#1E3A34; --card-bg:#2E2823; --shadow:0 4px 14px rgba(0,0,0,.4); }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;line-height:1.45;overflow:hidden}
+button{font:inherit;cursor:pointer;color:inherit}
+.wrap{max-width:1020px;height:100dvh;margin:0 auto;padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px}
+/* ===== ステータスバー ===== */
+.statusbar{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:6px 10px;box-shadow:var(--shadow);flex:none}
+.sb-row1{display:flex;gap:8px;align-items:center}
+.sb-row1 h1{font-size:19px;margin:0;white-space:nowrap;letter-spacing:.02em}
+.turnpill{background:var(--ink);color:var(--bg);padding:3px 11px;border-radius:999px;font-weight:800;font-size:13px;white-space:nowrap}
+.phase{font-weight:700;color:var(--accent);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smallbtn{border-radius:999px;border:2px solid var(--ink);padding:4px 13px;font-weight:900;background:var(--surface);min-height:36px;font-size:13px;white-space:nowrap}
+.smallbtn.ghost{border-color:var(--line)}
+.sb-row2{display:flex;justify-content:center;align-items:center;margin-top:5px}
+.bar{height:10px;background:var(--surface);border-radius:999px;overflow:hidden;border:1px solid var(--line);display:block;width:100%}
+.bar i{display:block;height:100%;background:var(--teal);transition:width .4s}
+.bar.low i{background:var(--accent)}
+.momentum{color:var(--gold);letter-spacing:1px;font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden}
+.diffseg{display:flex;gap:4px;justify-self:center}
+/* ===== ステータス（各手札エリアのそばに分けて配置・中サイズ） ===== */
+.ministatus{display:flex;align-items:center;gap:11px;background:var(--surface2);border:1.5px solid var(--line);border-radius:999px;padding:3px 11px;flex:none}
+.ministatus.you{background:var(--teal-bg)}
+.ms-group{display:flex;align-items:center;gap:4px;white-space:nowrap;min-width:0}
+.ms-label{font-size:11px;font-weight:900;color:var(--muted);letter-spacing:.04em}
+.ms-num{font-size:19px;font-weight:900;line-height:1}
+.ms-num.sta{color:var(--teal)}
+.ms-num.mom{color:#9A6B00}
+@media(prefers-color-scheme:dark){.ms-num.mom{color:var(--gold)}}
+.ms-unit{font-size:11px;font-weight:800;color:var(--muted)}
+.ms-bar{width:52px;height:7px;flex:none}
+.ms-stars{font-size:11px}
+.diffbtn{border:2px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:999px;padding:3px 12px;font-weight:900;font-size:12.5px;min-height:32px;line-height:1.2}
+.diffbtn.active{border-color:var(--accent);background:var(--card-bg);box-shadow:0 0 0 2px rgba(217,72,59,.22);color:var(--accent)}
+/* ===== 手札エリア ===== */
+.handarea{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:6px 8px 8px;box-shadow:var(--shadow);flex:none}
+.area-head{display:flex;gap:7px;align-items:center;font-weight:900;font-size:14px;margin-bottom:5px;flex-wrap:wrap}
+.area-head .avatar{font-size:20px;line-height:1}
+.area-head .spacer{flex:1}
+.area-note{font-size:11px;color:var(--muted);font-weight:700}
+.debuff{background:#FFE1DC;color:#8F1F14;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800}
+@media(prefers-color-scheme:dark){.debuff{background:#4A221C;color:#FFB3A7}}
+.diffchip{background:var(--surface2);border:1.5px solid var(--line);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800}
+.hand{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px}
+@media(max-width:760px){.hand{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:760px){
+  .statusbar{padding:6px 7px}
+  .sb-row1{flex-wrap:wrap;row-gap:3px}
+  .sb-row1 h1{font-size:16px}
+  .turnpill{font-size:12px;padding:2px 8px}
+  .phase{order:5;flex:1 1 100%;white-space:normal;font-size:12px}
+  .smallbtn{padding:3px 9px;font-size:12px;min-height:32px}
+  .sb-row2{margin-top:4px}
+  .area-note{display:none}
+  .ministatus{gap:7px;padding:2px 7px}
+  .ms-num{font-size:18px}
+  .ms-bar{width:26px;height:6px}
+  .ms-label{font-size:10px}
+  .ms-unit{font-size:10px}
+  .ms-stars{font-size:10px}
+  .area-head{font-size:13px;margin-bottom:4px;gap:5px}
+  .area-head .avatar{font-size:17px}
+  .diffchip{display:none}
+  .handarea{padding:5px 7px 6px}
+  .diffbtn{min-height:27px;padding:2px 10px;font-size:12px}
+  .hand{gap:5px}
+}
+.hand .empty-note{grid-column:1/-1;font-size:12px;color:var(--muted);padding:6px 2px}
+/* ===== 小型タイル ===== */
+.card{position:relative;background:var(--card-bg);border:2px solid var(--line);border-radius:10px;padding:21px 3px 4px;text-align:center;height:clamp(60px,11dvh,94px);display:flex;flex-direction:column;align-items:center;gap:1px;transition:transform .12s,border-color .12s;width:100%;min-height:0;overflow:hidden}
+@media(max-width:760px){.card{height:clamp(54px,8.5dvh,72px)}}
+button.card:not(.unplayable):hover{transform:translateY(-2px)}
+.card.selected{border-color:var(--accent);box-shadow:0 0 0 3px rgba(217,72,59,.25);transform:translateY(-2px)}
+.card.inspected{border-color:var(--teal);box-shadow:0 0 0 3px rgba(23,126,108,.25)}
+.card.unplayable{opacity:.42;filter:grayscale(.7)}
+.card .cost{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:var(--cost);color:#fff;display:grid;place-items:center;font-weight:900;font-size:12px}
+.card .pow{position:absolute;top:3px;right:3px;min-width:22px;height:22px;padding:0 3px;background:var(--pow);color:#fff;display:grid;place-items:center;font-weight:900;font-size:12px;clip-path:polygon(50% 0,63% 12%,79% 5%,82% 22%,98% 25%,90% 40%,100% 52%,88% 62%,94% 79%,77% 80%,70% 97%,55% 85%,38% 100%,33% 82%,15% 88%,16% 70%,0 60%,12% 47%,4% 30%,22% 27%,28% 9%,43% 18%)}
+.card .pow.none{clip-path:none;border-radius:999px;font-size:9px;background:var(--muted)}
+.card .emoji{font-size:clamp(16px,2.6dvh,23px);text-align:center;line-height:1.05}
+.card .cname{font-weight:900;font-size:10.5px;text-align:center;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
+.card .eff{font-size:9.5px;color:var(--muted);line-height:1.2;text-align:center;font-weight:700}
+/* ===== 対戦エリア（v4配分：公開スロットの横に詳細） ===== */
+.battlearea{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:7px 8px;box-shadow:var(--shadow);flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+.battlearea.is-animating{cursor:pointer}
+.battle-main{display:flex;flex-direction:row;gap:8px;flex:1 1 auto;min-height:0}
+.slots{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:stretch;flex:1 1 auto;min-width:0;min-height:0}
+.slot{border:2.5px dashed var(--line);border-radius:12px;display:grid;place-items:center;padding:5px;text-align:center;background:var(--surface2);min-height:0;overflow:hidden;position:relative}
+/* ===== 公開演出：裏向きスライドイン → 同時フリップ → 結果演出 ===== */
+.flip-scene{perspective:700px;width:100%;height:100%;display:grid;place-items:center;min-height:0}
+.flip-outer{width:100%;height:100%;display:grid;place-items:center;min-height:0;animation:slideInP .38s cubic-bezier(.2,.9,.3,1.15) both}
+.flip-outer.from-top{animation-name:slideInC}
+@keyframes slideInP{from{transform:translateY(26px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes slideInC{from{transform:translateY(-26px);opacity:0}to{transform:translateY(0);opacity:1}}
+.flip-card{position:relative;width:100%;height:100%;min-height:0;transform-style:preserve-3d;transition:transform .48s cubic-bezier(.35,.15,.25,1)}
+.flip-card.flipped{transform:rotateY(180deg)}
+.flip-card.instant{transition:none}
+.flip-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:grid;place-items:center;min-height:0}
+.flip-face.front{transform:rotateY(180deg)}
+.flip-face.front .card.mini{height:100%}
+.card-back{width:100%;height:100%;min-height:0;border:2px solid #8F2A20;border-radius:10px;background-color:#B03A2E;background-image:radial-gradient(circle at 22% 28%,rgba(255,255,255,.28) 0 5px,transparent 6px),radial-gradient(circle at 72% 62%,rgba(255,255,255,.22) 0 5px,transparent 6px),radial-gradient(circle at 45% 82%,rgba(0,0,0,.14) 0 6px,transparent 7px),repeating-linear-gradient(45deg,rgba(255,255,255,.07) 0 8px,transparent 8px 16px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#FFE9C9;box-shadow:inset 0 0 0 4px rgba(255,233,201,.35)}
+.card-back .back-paw{font-size:clamp(20px,3.6dvh,34px);line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+.card-back .back-txt{font-size:9px;font-weight:900;letter-spacing:.28em;color:#FFE9C9}
+@media(max-width:760px){.card-back .back-txt{display:none}.card-back .back-paw{font-size:17px}}
+.flip-card.fx-win .card.mini{animation:winBounce .55s cubic-bezier(.2,1.6,.4,1) both;border-color:var(--gold);box-shadow:0 0 0 3px rgba(233,164,38,.55),0 0 22px rgba(233,164,38,.75)}
+@keyframes winBounce{0%{transform:scale(1)}35%{transform:scale(1.09) translateY(-4px)}65%{transform:scale(1.03)}100%{transform:scale(1.05)}}
+.flip-card.fx-lose .card.mini{animation:loseShake .45s ease both;filter:brightness(.68) saturate(.6)}
+@keyframes loseShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}55%{transform:translateX(4px)}80%{transform:translateX(-2px)}}
+.flip-card.fx-draw-l .card.mini{animation:drawBumpL .45s ease both}
+.flip-card.fx-draw-r .card.mini{animation:drawBumpR .45s ease both}
+@keyframes drawBumpL{0%,100%{transform:translateX(0)}45%{transform:translateX(7px) rotate(1.5deg)}}
+@keyframes drawBumpR{0%,100%{transform:translateX(0)}45%{transform:translateX(-7px) rotate(-1.5deg)}}
+.flip-card.fx-shatter .card.mini{animation:shatterHit .6s ease both;border-color:#8F1F14}
+@keyframes shatterHit{0%{transform:scale(1)}20%{transform:scale(1.06) rotate(2.5deg)}40%{transform:scale(.94) rotate(-3deg)}60%{transform:scale(1.02) rotate(2deg);filter:brightness(.75)}100%{transform:scale(.96) rotate(-1deg);filter:brightness(.8) saturate(.5)}}
+.mom-pop{position:absolute;top:2px;left:50%;transform:translateX(-50%);z-index:6;font-weight:900;font-size:17px;color:#9A6B00;background:#FFF3D1;border:2px solid var(--gold);border-radius:999px;padding:1px 10px;white-space:nowrap;pointer-events:none;animation:momPop 1.15s ease-out both;box-shadow:0 4px 12px rgba(150,100,0,.3)}
+@media(prefers-color-scheme:dark){.mom-pop{color:var(--gold);background:#3A2F10}}
+@keyframes momPop{0%{opacity:0;transform:translate(-50%,8px) scale(.6)}25%{opacity:1;transform:translate(-50%,-3px) scale(1.18)}55%{transform:translate(-50%,-8px) scale(1)}100%{opacity:0;transform:translate(-50%,-20px) scale(1)}}
+.fx-badge{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);z-index:6;font-weight:900;font-size:13px;border-radius:999px;padding:2px 11px;white-space:nowrap;pointer-events:none;animation:badgePop .5s cubic-bezier(.2,1.6,.4,1) both;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.fx-badge.burst{background:#8F1F14;color:#FFE1DC}
+.fx-badge.shield{background:#DFF5EE;color:#0E5A4C;border:2px solid var(--teal)}
+@media(prefers-color-scheme:dark){.fx-badge.shield{background:#1E3A34;color:#9FE8D6}}
+@keyframes badgePop{from{opacity:0;transform:translate(-50%,6px) scale(.5)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+.debuff-badge{position:absolute;top:24px;right:4px;z-index:5;background:#8F1F14;color:#fff;font-weight:900;font-size:11px;border-radius:999px;padding:0 7px;line-height:1.7;animation:badgePop .4s ease both;pointer-events:none}
+.climax-fx{position:absolute;inset:0;z-index:8;display:grid;place-items:center;pointer-events:none;background:radial-gradient(circle at 50% 45%,rgba(255,214,90,.5),rgba(255,170,40,.14) 55%,transparent 78%);animation:climaxFlash 1.3s ease-out both}
+.climax-fx[hidden]{display:none}
+.climax-fx span{font-size:clamp(24px,5.2dvh,42px);font-weight:900;letter-spacing:.06em;color:#8F5B00;text-shadow:0 2px 0 #FFF3D1,0 0 26px rgba(255,200,60,.95);animation:climaxText 1.3s cubic-bezier(.2,1.4,.3,1) both;text-align:center;padding:0 10px}
+@media(prefers-color-scheme:dark){.climax-fx span{color:#FFD76A;text-shadow:0 2px 0 rgba(0,0,0,.5),0 0 26px rgba(255,200,60,.8)}}
+@keyframes climaxFlash{0%{opacity:0}18%{opacity:1}70%{opacity:1}100%{opacity:0}}
+@keyframes climaxText{0%{transform:scale(.5);opacity:0}25%{transform:scale(1.14);opacity:1}45%{transform:scale(1)}80%{opacity:1}100%{transform:scale(1.02);opacity:0}}
+.ministatus.stat-pop{animation:statPop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes statPop{0%{transform:scale(1)}40%{transform:scale(1.13)}100%{transform:scale(1)}}
+.debuff.pulse{animation:debuffPulse .8s ease 2}
+@keyframes debuffPulse{50%{transform:scale(1.22);box-shadow:0 0 0 4px rgba(217,72,59,.35)}}
+.debuff-note{font-weight:900;color:#8F1F14;animation:badgePop .45s ease both}
+@media(prefers-color-scheme:dark){.debuff-note{color:#FFB3A7}}
+.go-stars{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:12px}
+.go-stars i{position:absolute;top:-8px;font-style:normal;color:var(--gold);animation:starFall 1.5s ease-in both;text-shadow:0 1px 3px rgba(150,100,0,.4)}
+@keyframes starFall{0%{transform:translateY(0) rotate(0);opacity:0}15%{opacity:1}100%{transform:translateY(64px) rotate(160deg);opacity:0}}
+body.is-animating .hand button,body.is-animating .diffbtn,body.is-animating .smallbtn,body.is-animating .actions .btn{pointer-events:none}
+@media(prefers-reduced-motion:reduce){
+  .flip-outer{animation:none}
+  .flip-card{transition:none}
+  .flip-card.fx-win .card.mini,.flip-card.fx-lose .card.mini,.flip-card.fx-draw-l .card.mini,.flip-card.fx-draw-r .card.mini,.flip-card.fx-shatter .card.mini,.mom-pop,.fx-badge,.climax-fx,.climax-fx span,.ministatus.stat-pop,.debuff.pulse,.go-stars i{animation:none}
+  .mom-pop{opacity:1}
+  .climax-fx{opacity:1}
+}
+.slot.filled{border-style:solid;border-color:var(--line);background:var(--card-bg)}
+.slot .card.mini{height:min(150px,100%);width:100%}
+.mini .emoji{font-size:clamp(20px,3.4dvh,30px)}
+.mini .cname{font-size:11.5px}
+.mini .eff{font-size:10px}
+.vs{align-self:center;font-weight:900;font-size:19px;color:var(--accent);text-align:center}
+/* ===== 詳細＝カードの拡大図（縦型カードそのまま） ===== */
+.detail{flex:0 0 300px;width:300px;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;color:var(--ink)}
+.bigcard{position:relative;background:var(--card-bg);border:2.5px solid var(--line);border-radius:14px;padding:10px 12px 11px;display:flex;flex-direction:column;gap:6px;flex:none;height:auto;min-height:0;overflow:visible}
+.bigcard.selected{border-color:var(--accent);box-shadow:0 0 0 3px rgba(217,72,59,.22)}
+.bigcard .bc-cost{position:absolute;top:9px;left:9px;width:37px;height:37px;border-radius:50%;background:var(--cost);color:#fff;display:grid;place-items:center;font-weight:900;font-size:19px}
+.bigcard .bc-pow{position:absolute;top:7px;right:7px;min-width:42px;height:42px;padding:0 5px;background:var(--pow);color:#fff;display:grid;place-items:center;font-weight:900;font-size:19px;clip-path:polygon(50% 0,63% 12%,79% 5%,82% 22%,98% 25%,90% 40%,100% 52%,88% 62%,94% 79%,77% 80%,70% 97%,55% 85%,38% 100%,33% 82%,15% 88%,16% 70%,0 60%,12% 47%,4% 30%,22% 27%,28% 9%,43% 18%)}
+.bigcard .bc-pow.none{clip-path:none;border-radius:999px;font-size:12px;background:var(--muted);min-width:46px;height:30px;top:12px}
+.bigcard .bc-owner{align-self:center;font-size:11px;font-weight:900;color:var(--muted);letter-spacing:.05em;margin-top:1px}
+.bigcard .bc-name{font-weight:900;font-size:20px;line-height:1.3;text-align:center;word-break:break-all;padding:0 40px;min-height:0}
+.bigcard .bc-art{background:var(--surface2);border:1.5px solid var(--line);border-radius:10px;text-align:center;font-size:30px;line-height:1.1;padding:4px 4px;flex:none}
+.bigcard .bc-eff{overflow:visible;height:auto;min-height:0;padding:0 3px;flex:none}
+.bigcard .d-effitem{font-size:15px;line-height:1.6;color:var(--ink);margin:4px 0}
+.bigcard .d-efflabel{display:block;font-weight:900;font-size:14.5px;color:var(--ink);line-height:1.45}
+.bigcard .d-efflabel::before{content:"▸ ";color:var(--accent);font-weight:900}
+.bigcard .d-efftext{display:block;padding-left:14px}
+.bigcard .d-effplain{font-size:15px;line-height:1.6;color:var(--ink)}
+.bigcard .d-effplain.muted{color:var(--muted);font-weight:700}
+.bigcard strong.hl{color:var(--accent);font-weight:900}
+.bigcard strong.key{color:var(--ink);font-weight:900;text-decoration:underline;text-decoration-color:var(--gold);text-decoration-thickness:3px;text-underline-offset:2px}
+.detail .d-reason{background:#FFE1DC;color:#8F1F14;border:2px solid #E88A7D;border-radius:10px;padding:7px 10px;font-size:13.5px;font-weight:900;line-height:1.5;display:flex;gap:7px;align-items:flex-start;flex:none}
+@media(prefers-color-scheme:dark){.detail .d-reason{background:#4A221C;color:#FFC4B8;border-color:#8A463C}}
+.detail .d-note{font-size:12.5px;line-height:1.5;color:var(--muted);font-weight:700;flex:none;text-align:center}
+.detail .d-note.selected{color:var(--accent);font-weight:900}
+.bigcard.placeholder{border-style:dashed;align-items:center;justify-content:center;text-align:center;gap:7px;padding:18px 16px}
+.bigcard.placeholder .bc-ph-icon{font-size:34px;line-height:1}
+.bigcard.placeholder .bc-ph-title{font-size:16px;font-weight:900}
+.bigcard.placeholder .bc-ph-text{font-size:13.5px;line-height:1.65;color:var(--muted);font-weight:700}
+@media(max-width:760px){
+  .battle-main{flex-direction:column;gap:6px}
+  .slots{flex:none;height:clamp(38px,5.8dvh,50px)}
+  .slot .hint{font-size:11px}
+  .detail{flex:1 1 auto;width:100%;align-items:center;overflow-y:auto}
+  .bigcard{width:min(320px,100%);flex:none;height:auto;padding:8px 10px 9px;gap:5px}
+  .bigcard .bc-name{font-size:18px}
+  .bigcard .bc-art{font-size:15px;padding:0 4px;line-height:1.1}
+  .bigcard .bc-cost{width:31px;height:31px;font-size:16px;top:7px;left:7px}
+  .bigcard .bc-pow{min-width:36px;height:36px;font-size:16px;top:5px;right:5px}
+  .bigcard .d-effitem,.bigcard .d-effplain{font-size:14.5px;line-height:1.45}
+  .bigcard .d-efflabel{font-size:14px}
+  .detail .d-reason,.detail .d-note{width:min(320px,100%)}
+  .detail .d-note{font-size:11.5px}
+  .bigcard.placeholder{padding:10px 12px;gap:5px}
+  .bigcard.placeholder .bc-ph-icon{font-size:26px}
+  .bigcard.placeholder .bc-ph-title{font-size:15px}
+  .bigcard.placeholder .bc-ph-text{font-size:12.5px;line-height:1.55}
+  .card{height:clamp(42px,6.2dvh,50px);padding-top:18px}
+  .card .cname{display:none}
+  .card .eff{font-size:8px;line-height:1.15;white-space:nowrap}
+  .card .emoji{font-size:14px}
+  .btn{min-height:38px;padding:5px 16px}
+  .battlearea{padding:6px 7px;gap:5px}
+}
+.result{background:var(--teal-bg);border-radius:10px;padding:6px 10px;font-size:12.5px;flex:none;max-height:19dvh;overflow-y:auto}
+.result:empty{display:none}
+.result p{margin:2px 0}
+.result .big{font-weight:900;font-size:13.5px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;flex:none;align-items:center}
+.btn{border-radius:999px;border:2px solid var(--ink);padding:7px 20px;font-weight:900;background:var(--surface);color:var(--ink);min-height:42px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.teal{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.gameover{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface2);border:2px solid var(--line);border-radius:12px;padding:7px 12px;flex:none;position:relative;overflow:hidden}
+.gameover[hidden]{display:none}
+.gameover .face{font-size:30px;line-height:1}
+.gameover h2{font-size:19px;margin:0}
+.gameover p{margin:0;font-size:12.5px;color:var(--muted);flex:1;min-width:140px}
+.hint{font-size:12px;color:var(--muted)}
+.smallbtn.rulesbtn{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+/* ===== ルール画面（専用モーダル） ===== */
+.rules-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(760px,calc(100% - 20px));max-height:92dvh;overflow-y:auto;background:var(--surface);border:2px solid var(--line);border-radius:18px;z-index:70;padding:0 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.rules-modal[hidden]{display:none}
+.rules-head{position:sticky;top:0;background:var(--surface);display:flex;align-items:center;gap:8px;font-weight:900;font-size:18px;padding:14px 0 10px;z-index:2;border-bottom:2px solid var(--line)}
+.rules-head .spacer{flex:1}
+.rules-sec{margin-top:18px}
+.rules-sec>h3{font-size:16px;margin:0 0 8px;display:flex;align-items:center;gap:7px}
+.rules-sec>h3 .sec-no{background:var(--accent);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:13px;flex:none}
+.rules-sec p.lead{margin:0 0 8px;font-size:13.5px;line-height:1.65}
+.rule-flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:5px;align-items:stretch}
+.rule-flow .step{background:var(--surface2);border:1.5px solid var(--line);border-radius:12px;padding:8px 7px;text-align:center}
+.rule-flow .step .ic{font-size:21px;line-height:1.2;display:block}
+.rule-flow .step b{display:block;font-size:13px;margin:2px 0}
+.rule-flow .step span{font-size:11px;color:var(--muted);font-weight:700;line-height:1.35;display:block}
+.rule-flow .arrow{align-self:center;font-weight:900;color:var(--accent);font-size:15px}
+.rule-facts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.rule-fact{background:var(--card-bg);border:1.5px solid var(--line);border-radius:12px;padding:8px 6px;text-align:center}
+.rule-fact .fv{font-size:19px;font-weight:900;line-height:1.15}
+.rule-fact .fv em{font-style:normal;color:var(--accent)}
+.rule-fact .fl{font-size:11px;color:var(--muted);font-weight:800;margin-top:2px;line-height:1.35}
+.versus-box{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:stretch}
+.versus-cell{background:var(--surface2);border:1.5px solid var(--line);border-radius:12px;padding:9px 10px;font-size:13px;line-height:1.55}
+.versus-cell b{display:block;font-size:14px;margin-bottom:2px}
+.versus-cell.win{border-color:var(--gold);background:#FFF6DC}
+@media(prefers-color-scheme:dark){.versus-cell.win{background:#3A2F10}}
+.versus-mid{align-self:center;font-weight:900;color:var(--accent);font-size:17px}
+.rule-loop-note{margin:7px 0 0;text-align:center;font-size:12.5px;font-weight:800;color:var(--muted)}
+.climax-callout{display:flex;gap:10px;align-items:flex-start;margin-top:8px;background:#FFF6DC;border:2px solid var(--gold);border-radius:12px;padding:10px 12px}
+@media(prefers-color-scheme:dark){.climax-callout{background:#3A2F10}}
+.climax-callout .cc-ic{font-size:24px;line-height:1.2;flex:none}
+.climax-callout b{display:block;font-size:14.5px;line-height:1.4}
+.climax-callout span{font-size:13px;line-height:1.6;display:block;margin-top:2px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px}
+.gcard{position:relative;background:var(--card-bg);border:2px solid var(--line);border-radius:12px;padding:9px 11px 10px 46px;min-height:86px}
+.gcard .g-cost{position:absolute;top:9px;left:9px;width:28px;height:28px;border-radius:50%;background:var(--cost);color:#fff;display:grid;place-items:center;font-weight:900;font-size:14px}
+.gcard .g-top{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.gcard .g-emoji{font-size:17px}
+.gcard .g-name{font-weight:900;font-size:14.5px;line-height:1.3}
+.gcard .g-pow{margin-left:auto;font-size:11px;font-weight:900;background:var(--pow);color:#fff;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.gcard .g-pow.none{background:var(--muted)}
+.gcard .g-tag{font-size:10px;font-weight:900;border-radius:999px;padding:1px 7px;background:var(--surface2);border:1.5px solid var(--gold);color:#9A6B00;white-space:nowrap}
+@media(prefers-color-scheme:dark){.gcard .g-tag{color:var(--gold)}}
+.gcard .d-effitem{font-size:12.5px;line-height:1.5;margin:3px 0}
+.gcard .d-efflabel{display:block;font-weight:900;font-size:12px}
+.gcard .d-efflabel::before{content:"▸ ";color:var(--accent)}
+.gcard .d-efftext{display:block;padding-left:12px}
+.gcard .d-effplain{font-size:12.5px;line-height:1.5}
+.gcard .d-effplain.muted{color:var(--muted);font-weight:700}
+.gcard strong.hl{color:var(--accent)}
+.gcard strong.key{text-decoration:underline;text-decoration-color:var(--gold);text-decoration-thickness:3px;text-underline-offset:2px}
+.matchups{display:flex;flex-direction:column;gap:6px}
+.matchup{display:flex;gap:9px;align-items:flex-start;background:var(--surface2);border:1.5px solid var(--line);border-radius:12px;padding:8px 11px;font-size:13px;line-height:1.55}
+.matchup .m-ic{font-size:19px;line-height:1.3;flex:none}
+.matchup b{font-weight:900}
+.rule-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.rule-list li{background:var(--card-bg);border:1.5px solid var(--line);border-radius:12px;padding:8px 11px;font-size:13px;line-height:1.6}
+.rule-list li b{font-weight:900}
+.diff-list{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.diff-item{background:var(--surface2);border:1.5px solid var(--line);border-radius:12px;padding:8px 10px;font-size:12.5px;line-height:1.55}
+.diff-item b{display:block;font-size:13.5px;margin-bottom:2px}
+.rules-open-link{margin-top:12px;width:100%}
+@media(max-width:760px){
+  .rules-modal{padding:0 12px calc(14px + env(safe-area-inset-bottom))}
+  .rule-flow{grid-template-columns:1fr auto 1fr;grid-template-rows:auto auto}
+  .rule-flow .arrow.a2{display:none}
+  .rule-facts{grid-template-columns:repeat(2,1fr)}
+  .gallery{grid-template-columns:1fr}
+  .diff-list{grid-template-columns:1fr}
+  .versus-box{grid-template-columns:1fr}
+  .versus-mid{text-align:center}
+}
+/* ===== オンライン対戦 ===== */
+.sb-row2{gap:8px;flex-wrap:wrap}
+.onlinebtn{background:var(--teal);border-color:var(--teal);color:#fff}
+.onlinebtn.connected{background:var(--surface);border-color:var(--accent);color:var(--accent)}
+.online-pill{display:inline-flex;align-items:center;gap:6px;background:var(--teal-bg);border:1.5px solid var(--teal);border-radius:999px;padding:3px 11px;font-size:12px;font-weight:900;white-space:nowrap}
+.online-pill .dot{width:9px;height:9px;border-radius:50%;background:var(--teal);flex:none;animation:pulse 1.4s infinite}
+.lobby-sec{margin-top:16px;background:var(--surface2);border:1.5px solid var(--line);border-radius:12px;padding:12px 13px}
+.lobby-sec h4{margin:0 0 6px;font-size:15px}
+.lobby-sec p{margin:0 0 9px;font-size:13px;line-height:1.6}
+.roomcode-box{text-align:center;margin:10px 0 4px}
+.roomcode{font-size:34px;font-weight:900;letter-spacing:.32em;padding:8px 6px 8px 14px;background:var(--card-bg);border:2.5px dashed var(--gold);border-radius:12px;color:var(--ink);line-height:1.25;word-break:break-all}
+.roomcode-box .hint{display:block;margin-top:6px}
+.join-row{display:flex;gap:8px;flex-wrap:wrap}
+.join-row input{flex:1 1 150px;min-width:0;font:inherit;font-weight:900;font-size:19px;letter-spacing:.22em;text-transform:uppercase;padding:8px 12px;border:2px solid var(--line);border-radius:12px;background:var(--card-bg);color:var(--ink);min-height:46px}
+.join-row input:focus{outline:none;border-color:var(--teal)}
+.lobby-status{margin-top:12px;font-size:13.5px;font-weight:800;line-height:1.6;background:var(--card-bg);border:1.5px solid var(--line);border-radius:12px;padding:9px 12px}
+.lobby-status:empty{display:none}
+.lobby-note{font-size:12.5px;line-height:1.65;color:var(--muted);font-weight:700;margin-top:12px}
+/* ===== 履歴ドロワー ===== */
+.backdrop{position:fixed;inset:0;background:rgba(30,20,10,.38);z-index:55}
+.backdrop[hidden]{display:none}
+.drawer{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(1020px,100%);max-height:74dvh;overflow-y:auto;background:var(--surface);border:2px solid var(--line);border-bottom:none;border-radius:16px 16px 0 0;z-index:60;padding:12px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+.drawer[hidden]{display:none}
+.drawer-head{display:flex;align-items:center;gap:8px;font-weight:900;font-size:16px}
+.drawer-head .spacer{flex:1}
+.log{list-style:none;margin:8px 0 0;padding:0;font-size:13px}
+.log li{padding:7px 4px;border-top:1px solid var(--line);display:flex;gap:8px}
+.log .t{font-weight:900;white-space:nowrap}
+.drawer details{margin-top:12px;border-top:1px solid var(--line);padding-top:8px}
+.drawer summary{font-weight:900;min-height:36px;display:flex;align-items:center;cursor:pointer}
+.drawer details li{margin:3px 0;font-size:13.5px}
+.thinking{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.5}}
+@media(prefers-reduced-motion:reduce){.thinking{animation:none}.card{transition:none}}
+@media(max-height:560px){
+  .card{height:56px;padding-top:19px}
+  .card .emoji{font-size:14px}
+  .wrap{gap:4px;padding-top:5px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ① ステータスバー -->
+  <header class="statusbar">
+    <div class="sb-row1">
+      <h1>🐾 ネコのケンカ</h1>
+      <span class="turnpill" id="turnLabel">ターン 1</span>
+      <span class="phase" id="phaseLabel">カードを選んでね</span>
+      <button class="smallbtn rulesbtn" id="rulesBtn" type="button">📖 ルール</button>
+      <button class="smallbtn ghost" id="historyBtn" type="button">📜 履歴</button>
+      <button class="smallbtn" id="restartTop" type="button">↩ 最初から</button>
+    </div>
+    <div class="sb-row2">
+      <div class="diffseg" id="diffSeg" role="radiogroup" aria-label="難易度を選択">
+        <button type="button" class="diffbtn" data-diff="easy" role="radio" aria-checked="false">かんたん</button>
+        <button type="button" class="diffbtn" data-diff="normal" role="radio" aria-checked="true">ふつう</button>
+        <button type="button" class="diffbtn" data-diff="strong" role="radio" aria-checked="false">つよい</button>
+      </div>
+      <span class="online-pill" id="onlinePill" hidden><span class="dot" aria-hidden="true"></span><span id="onlinePillText">オンライン対戦中</span></span>
+      <button class="smallbtn onlinebtn" id="onlineBtn" type="button">🌐 オンライン対戦</button>
+    </div>
+  </header>
+
+  <!-- ② CPU手札（CPUのステータスはこのエリア内にだけ置く） -->
+  <section class="handarea" aria-label="CPUの手札">
+    <div class="area-head"><span class="avatar" id="oppAvatar">😼</span> <span id="oppNameLabel">CPUの手札</span> <span class="diffchip" id="cpuDiffChip">難易度：ふつう</span> <span class="debuff" id="cpuDebuff" hidden>シャーでパワー-1中</span><span class="spacer"></span><span class="area-note">全カード公開中・タップで詳細</span>
+      <span class="ministatus" aria-label="CPUのスタミナと勢い">
+        <span class="ms-group"><span class="ms-label">スタミナ</span><span class="ms-num sta" id="cpuStaminaNum">20</span><span class="ms-unit">/ 20</span><span class="bar ms-bar" id="cpuBarWrap"><i id="cpuBar" style="width:100%"></i></span></span>
+        <span class="ms-group"><span class="ms-label">勢い</span><span class="ms-num mom" id="cpuMomNum">0</span><span class="momentum ms-stars" id="cpuMomStars">—</span></span>
+      </span>
+    </div>
+    <div class="hand" id="cpuHandEl" aria-label="CPUの手札（公開）"></div>
+  </section>
+
+  <!-- ③ 対戦エリア -->
+  <section class="battlearea" id="battleArea" aria-label="バトルフィールド">
+    <div class="climax-fx" id="climaxFx" hidden><span id="climaxFxText">👑 クライマックス！</span></div>
+    <div class="battle-main">
+      <div class="slots">
+        <div class="slot" id="playerSlot"><span class="hint">あなたのカードは<br>ここに出ます</span></div>
+        <div class="vs">VS</div>
+        <div class="slot" id="cpuSlot"><span class="hint">CPUのカードは<br>ここに出ます</span></div>
+      </div>
+      <div class="detail" id="detailBox" aria-live="polite"><div class="bigcard placeholder"><span class="bc-ph-icon">👆</span><span class="bc-ph-title">カードの拡大図</span><span class="bc-ph-text">手札のカードをタップすると、ここにそのカードが大きく表示されます。自分のカードはタップでそのまま選択もできます。</span></div></div>
+    </div>
+    <div class="result" id="resultBox" aria-live="polite"></div>
+    <div class="actions">
+      <button class="btn primary" id="confirmBtn" disabled>このカードで勝負！</button>
+      <button class="btn teal" id="nextBtn" hidden>次のターンへ ▶</button>
+      <button class="btn primary" id="soloBtn" hidden>相手のターンを見る</button>
+    </div>
+    <div class="gameover" id="gameoverBox" hidden>
+      <span class="face" id="goFace">🏆</span>
+      <h2 id="goTitle"></h2>
+      <p id="goDetail"></p>
+      <button class="btn primary" id="againBtn">もう一局 🐾</button>
+    </div>
+  </section>
+
+  <!-- ④ 自分の手札（あなたのステータスはこのエリア内にだけ置く） -->
+  <section class="handarea" aria-label="あなたの手札">
+    <div class="area-head"><span class="avatar">🐱</span> あなたの手札 <span class="debuff" id="playerDebuff" hidden>シャーでパワー-1中</span><span class="spacer"></span><span class="area-note" id="handHint"></span>
+      <span class="ministatus you" aria-label="あなたのスタミナと勢い">
+        <span class="ms-group"><span class="ms-label">スタミナ</span><span class="ms-num sta" id="playerStaminaNum">20</span><span class="ms-unit">/ 20</span><span class="bar ms-bar" id="playerBarWrap"><i id="playerBar" style="width:100%"></i></span></span>
+        <span class="ms-group"><span class="ms-label">勢い</span><span class="ms-num mom" id="playerMomNum">0</span><span class="momentum ms-stars" id="playerMomStars">—</span></span>
+      </span>
+    </div>
+    <div class="hand" id="handEl"></div>
+  </section>
+</div>
+
+<!-- 履歴ドロワー -->
+<div class="backdrop" id="drawerBackdrop" hidden></div>
+<div class="drawer" id="historyDrawer" hidden role="dialog" aria-label="対戦履歴とルール">
+  <div class="drawer-head">📜 対戦履歴 <span class="spacer"></span><button class="smallbtn ghost" id="drawerClose" type="button">閉じる ✕</button></div>
+  <p class="hint" id="diffDesc" style="margin:6px 0 0"></p>
+  <ul class="log" id="logEl"><li class="hint">まだ対戦が始まっていません</li></ul>
+  <button class="btn primary rules-open-link" id="rulesFromHistory" type="button">📖 ルールを図解で見る</button>
+</div>
+
+<!-- オンライン対戦ロビー -->
+<div class="backdrop" id="onlineBackdrop" hidden></div>
+<div class="rules-modal" id="onlineModal" hidden role="dialog" aria-modal="true" aria-label="オンライン対戦">
+  <div class="rules-head">🌐 オンライン対戦 <span class="spacer"></span><button class="smallbtn ghost" id="onlineClose" type="button">閉じる ✕</button></div>
+  <p class="lead" style="margin-top:12px;font-size:13.5px;line-height:1.65">離れた相手と、コードで部屋を作って対戦できます。カードは<strong>両方が選び終わるまで画面に表示されません</strong>（裏向きで出て同時公開）。手札はもともと全公開のゲームなので、見える情報はCPU戦と同じです。</p>
+
+  <div class="lobby-sec">
+    <h4>① 部屋を作る（ホスト）</h4>
+    <p>どちらか1人が部屋を作り、出てきた6文字のコードを相手に伝えてください（LINEなどでOK）。</p>
+    <button class="btn teal" id="createRoomBtn" type="button">部屋を作る</button>
+    <div class="roomcode-box" id="roomCodeBox" hidden>
+      <div class="roomcode" id="roomCodeText">------</div>
+      <span class="hint">このコードを相手に伝えてね。相手が入ってきたら自動で対戦が始まります。</span>
+      <div style="margin-top:8px"><button class="smallbtn" id="copyRoomBtn" type="button">コードをコピー</button></div>
+    </div>
+  </div>
+
+  <div class="lobby-sec">
+    <h4>② コードで部屋に入る（ゲスト）</h4>
+    <p>教えてもらった6文字のコードを入力してください。つながったら自動で対戦が始まります。</p>
+    <div class="join-row">
+      <input id="joinCodeInput" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" placeholder="コード6文字" aria-label="ルームコード">
+      <button class="btn primary" id="joinRoomBtn" type="button">部屋に入る</button>
+    </div>
+  </div>
+
+  <div class="lobby-status" id="lobbyStatus" role="status"></div>
+  <p class="lobby-note">※ 対戦中はこのページを開いたままにしてください。閉じる・リロードすると切断されます。つながらない時は、コードの打ち間違いと、相手が部屋を作ったまま待っているかを確認してみてください。通信は端末同士の直接接続（WebRTC）で、対戦データがサーバーに保存されることはありません。</p>
+</div>
+
+<!-- ルール画面 -->
+<div class="backdrop" id="rulesBackdrop" hidden></div>
+<div class="rules-modal" id="rulesModal" hidden role="dialog" aria-modal="true" aria-label="ルール説明">
+  <div class="rules-head">📖 ルール <span class="spacer"></span><button class="smallbtn ghost" id="rulesClose" type="button">閉じる ✕</button></div>
+
+  <section class="rules-sec">
+    <h3><span class="sec-no">1</span>ゲームの流れ</h3>
+    <p class="lead">ねらいは2つ。<strong>勢い ★</strong> を稼ぐことと、<strong>切り札</strong>を手に入れること。決着をつけるのは切り札です。</p>
+    <div class="rule-flow">
+      <div class="step"><span class="ic">🃏</span><b>カードを選ぶ</b><span>手札から1枚タップ</span></div>
+      <span class="arrow">▶</span>
+      <div class="step"><span class="ic">🙈</span><b>同時公開</b><span>裏向きで出て、同時にめくれる</span></div>
+      <span class="arrow a2">▶</span>
+      <div class="step"><span class="ic">💪</span><b>パワー勝負</b><span>数字が大きい方が勝ち・同点は引き分け</span></div>
+      <span class="arrow">▶</span>
+      <div class="step"><span class="ic">★</span><b>勝者は勢い +1</b><span>パワー5・6で勝てば切り札も獲得</span></div>
+    </div>
+    <p class="rule-loop-note">↺ ①〜④を繰り返して、勢いと切り札をためていく</p>
+    <div class="climax-callout">
+      <span class="cc-ic">👑</span>
+      <div>
+        <b>切り札を出したら、即クライマックスで決着</b>
+        <span>パワー勝負はせず、その時点の<strong>勢いが多い方の勝ち</strong>（同点なら引き分けで終了）。勢いを集めるだけでは終わりません。切り札を切るタイミングが勝負です。切り札の止め方はセクション4へ。</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="rules-sec">
+    <h3><span class="sec-no">2</span>基本ルール</h3>
+    <ul class="rule-list">
+      <li><b>スタミナは20。</b>カードを出すたびにコスト分だけ減り、回復しません。コストが払えないカードは出せません。</li>
+      <li><b>手札は9枚・使い切り。</b>両者とも同じ構成で、出したカードは戻りません。</li>
+      <li><b>最初のターンだけ、コスト4以下。</b>コスト5・6のカードは初手に出せません。</li>
+    </ul>
+  </section>
+
+  <section class="rules-sec">
+    <h3><span class="sec-no">3</span>カード図鑑</h3>
+    <p class="lead">緑の丸が<strong>コスト</strong>（スタミナ消費）、赤いバッジが<strong>パワー</strong>（強さ）。特殊なカードには 🏷 が付いています。</p>
+    <div class="gallery" id="cardGallery"></div>
+  </section>
+
+  <section class="rules-sec">
+    <h3><span class="sec-no">4</span>切り札「ギャフベロハギャベブ」の決着</h3>
+    <p class="lead">切り札はパワー勝負をせず、<strong>出した時点で即クライマックス</strong>。その時の勢いで勝敗が決まります。相手の手によって結果が変わります。</p>
+    <div class="matchups">
+      <div class="matchup"><span class="m-ic">👑</span><span><b>相手が通常カード</b> → クライマックス突入。その時点の<strong>勢いが多い方の勝ち</strong>（同点なら引き分けで終了）。</span></div>
+      <div class="matchup"><span class="m-ic">🐾</span><span><b>相手が猫パンチ!</b> → 切り札は<strong>無効化</strong>され、猫パンチ側が切り札を奪う。ゲームは続行（勢いは増えない）。</span></div>
+      <div class="matchup"><span class="m-ic">😤</span><span><b>相手がフーーーーッ!</b> → フーでは<strong>止められない</strong>。そのままクライマックスになる。</span></div>
+      <div class="matchup"><span class="m-ic">👑👑</span><span><b>両者が同時に出した</b> → 何も起きず、カードとコストだけ消費して続行。</span></div>
+    </div>
+  </section>
+
+  <section class="rules-sec">
+    <h3><span class="sec-no">5</span>終わり方とパス</h3>
+    <ul class="rule-list">
+      <li><b>出せるカードが無い人はパス。</b>残った方は1人でカードを出し続けられ、出したカードは無抵抗の勝利（勢い+1、パワー5/6なら切り札も獲得）。ただしフーは1人でも絶対に勝てないので勢いは得られません。</li>
+      <li><b>両者とも出せなくなったら終了。</b>その時点で勢いが多い方の勝ちです。</li>
+      <li><b>切り札が出たら即終了。</b>勢いの勝負で決着します（セクション4）。</li>
+    </ul>
+  </section>
+
+  <section class="rules-sec">
+    <h3><span class="sec-no">6</span>CPUの難易度</h3>
+    <p class="lead">画面上部のボタンでいつでも変更でき、対局中なら次のCPUの手から反映されます。</p>
+    <div class="diff-list">
+      <div class="diff-item"><b>かんたん</b>出せるカードからランダム。ルールに慣れる練習用。</div>
+      <div class="diff-item"><b>ふつう</b>ほどよく読んでくる。たまに甘い手も打つ。</div>
+      <div class="diff-item"><b>つよい</b>本気で読んでくる最良手狙い。</div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+"use strict";
+/* ============ カード定義 ============ */
+var DEFS = {
+  1:{name:"マーオ", cost:1, power:1, emoji:"😺", short:"効果なし", eff:"効果なし"},
+  2:{name:"マーーオ", cost:2, power:2, emoji:"😸", short:"効果なし", eff:"効果なし"},
+  3:{name:"マーーーオ", cost:3, power:3, emoji:"😽", short:"効果なし", eff:"効果なし"},
+  4:{name:"ウマーーーーオ", cost:4, power:4, emoji:"😼", short:"効果なし", eff:"効果なし"},
+  5:{name:"ウマアーーーーオ", cost:5, power:5, emoji:"😻", short:"勝てば切り札", eff:"勝利したら「ギャフベロハギャベブ」を1枚手札に加える"},
+  6:{name:"ウマアアアアアオ!!", cost:6, power:6, emoji:"🙀", short:"勝てば切り札", eff:"勝利したら「ギャフベロハギャベブ」を1枚手札に加える"},
+  7:{name:"シャーーーーッ!", cost:4, power:2, emoji:"😾💢", short:"次T相手-1", eff:"勝敗に関係なく、出すだけで次のターン相手のパワーを-1する"},
+  8:{name:"猫パンチ!", cost:4, power:5, emoji:"🐾", short:"切り札無効", eff:"相手の切り札を無効化して自分が切り札を得る（勢いは得ない）。通常相手ならパワー5で勝負"},
+  9:{name:"フーーーーッ!", cost:3, power:0, emoji:"😤", short:"勝てない・阻止", eff:"絶対に勝利できない。相手がこれに勝っても勢い・勝利時効果は得られない"},
+  10:{name:"ギャフベロハギャベブ", cost:3, power:null, emoji:"👑", short:"最終判定", eff:"クライマックス！ その時点の勢いが多い方の勝ち（同点は引き分け）"}
+};
+var uidSeq = 1;
+function mkCard(id){ return {uid: uidSeq++, id:id}; }
+function initialHand(){ return [1,2,3,4,5,6,7,8,9].map(mkCard); }
+function cardName(id){ return DEFS[id].name; }
+
+function legalCards(hand, stamina, turn){
+  return hand.filter(function(c){ var d=DEFS[c.id]; return d.cost<=stamina && (turn>1 || d.cost<=4); });
+}
+function hasLegal(hand, stamina, turn){ return legalCards(hand,stamina,turn).length>0; }
+function unplayableReason(card, stamina, turn){
+  var d=DEFS[card.id];
+  if(turn===1 && d.cost>4) return "初ターンはコスト4以下だけ出せます";
+  if(d.cost>stamina) return "スタミナ不足です（コスト"+d.cost+"／残りスタミナ"+stamina+"）";
+  return "";
+}
+
+/* ============ ターン解決（実ゲームとシミュレーション共通） ============ */
+function resolveTurn(st, pCard, cCard){
+  var msgs=[];
+  var nextP=false, nextC=false;
+  if(pCard){ st.pSta-=DEFS[pCard.id].cost; st.pHand=st.pHand.filter(function(x){return x.uid!==pCard.uid;}); }
+  if(cCard){ st.cSta-=DEFS[cCard.id].cost; st.cHand=st.cHand.filter(function(x){return x.uid!==cCard.uid;}); }
+  if(pCard && pCard.id===7) nextC=true;
+  if(cCard && cCard.id===7) nextP=true;
+
+  function finish(over, winner){
+    st.pDebuff=nextP; st.cDebuff=nextC; st.turn++;
+    return {over:over, winner:winner, msgs:msgs};
+  }
+  function climax(){
+    if(st.pMom>st.cMom){ msgs.push("クライマックス！ 勢い "+st.pMom+" 対 "+st.cMom+" で あなたの勝ち！"); return finish(true,'p'); }
+    if(st.cMom>st.pMom){ msgs.push("クライマックス！ 勢い "+st.pMom+" 対 "+st.cMom+" で CPUの勝ち…"); return finish(true,'c'); }
+    msgs.push("クライマックス！ 勢いは "+st.pMom+" 対 "+st.cMom+" の同点で引き分け。"); return finish(true,'draw');
+  }
+  function soloWin(isP, card){
+    if(card.id===10){ msgs.push((isP?"あなた":"CPU")+" がソロで切り札を切った！"); return climax(); }
+    if(card.id===9){ msgs.push((isP?"あなた":"CPU")+" のフーーーーッ! は絶対に勝利できないので、ソロでも勢いは得られない。"); return finish(false,null); }
+    if(isP) st.pMom++; else st.cMom++;
+    msgs.push((isP?"あなた":"CPU")+" は無抵抗の勝利で勢い+1！");
+    if(card.id===5||card.id===6){
+      var g=mkCard(10);
+      if(isP) st.pHand.push(g); else st.cHand.push(g);
+      msgs.push((isP?"あなた":"CPU")+" は勝利時効果で「ギャフベロハギャベブ」を手札に加えた！");
+    }
+    return finish(false,null);
+  }
+
+  if(!pCard && !cCard){ return finish(true, st.pMom>st.cMom?'p':(st.cMom>st.pMom?'c':'draw')); }
+  if(pCard && !cCard){ msgs.push("CPUは出せるカードがなくパス。あなたのソロターン！"); return soloWin(true,pCard); }
+  if(!pCard && cCard){ msgs.push("あなたは出せるカードがなくパス。CPUのソロターン。"); return soloWin(false,cCard); }
+
+  var pGyaf = pCard.id===10, cGyaf = cCard.id===10;
+  if(pGyaf && cGyaf){ msgs.push("両者同時に切り札！ 何も起こらず、カードとコストだけ消費して続行。"); return finish(false,null); }
+  if(pGyaf || cGyaf){
+    var other = pGyaf? cCard : pCard;
+    if(other.id===8){
+      var puncherIsP = !pGyaf;
+      var g2=mkCard(10);
+      if(puncherIsP){ st.pHand.push(g2); } else { st.cHand.push(g2); }
+      msgs.push("猫パンチ! が切り札を無効化！ "+(puncherIsP?"あなた":"CPU")+" が「ギャフベロハギャベブ」を得た（勢いは得ない）。ゲーム続行。");
+      return finish(false,null);
+    }
+    msgs.push((pGyaf?"あなた":"CPU")+" が切り札「ギャフベロハギャベブ」を切った！");
+    return climax();
+  }
+
+  var ep = DEFS[pCard.id].power + (st.pDebuff?-1:0);
+  var ec = DEFS[cCard.id].power + (st.cDebuff?-1:0);
+  var winner=null;
+  if(ep>ec && pCard.id!==9) winner='p';
+  else if(ec>ep && cCard.id!==9) winner='c';
+  if(!winner){ msgs.push("パワー "+ep+" 対 "+ec+" で引き分け。勢いも効果もなし。"); }
+  else{
+    var loserCard = winner==='p'? cCard : pCard;
+    var winCard = winner==='p'? pCard : cCard;
+    if(loserCard.id===9){
+      msgs.push("パワー "+ep+" 対 "+ec+" で "+(winner==='p'?"あなた":"CPU")+" の勝ち…だが相手はフーーーーッ! 勢いも勝利時効果も得られない！");
+    }else{
+      if(winner==='p') st.pMom++; else st.cMom++;
+      msgs.push("パワー "+ep+" 対 "+ec+" で "+(winner==='p'?"あなた":"CPU")+" の勝ち！ 勢い+1。");
+      if(winCard.id===5||winCard.id===6){
+        var g3=mkCard(10);
+        if(winner==='p') st.pHand.push(g3); else st.cHand.push(g3);
+        msgs.push((winner==='p'?"あなた":"CPU")+" は勝利時効果で「ギャフベロハギャベブ」を手札に加えた！");
+      }
+    }
+  }
+  if(pCard.id===7) msgs.push("あなたのシャー！ 次のターン、CPUのパワーが-1される。");
+  if(cCard.id===7) msgs.push("CPUのシャー！ 次のターン、あなたのパワーが-1される。");
+  return finish(false,null);
+}
+
+function checkBothStuck(st){
+  return !hasLegal(st.pHand,st.pSta,st.turn) && !hasLegal(st.cHand,st.cSta,st.turn);
+}
+function finalWinner(st){ return st.pMom>st.cMom?'p':(st.cMom>st.pMom?'c':'draw'); }
+
+function cloneState(st){
+  return { pHand:st.pHand.slice(), cHand:st.cHand.slice(), pSta:st.pSta, cSta:st.cSta,
+    pMom:st.pMom, cMom:st.cMom, turn:st.turn, pDebuff:st.pDebuff, cDebuff:st.cDebuff };
+}
+
+/* ============ モンテカルロCPU ============ */
+function randomLegal(hand, stamina, turn){
+  var l=legalCards(hand,stamina,turn);
+  if(!l.length) return null;
+  return l[Math.floor(Math.random()*l.length)];
+}
+function simulateGame(st, firstPCard, firstCCard){
+  var s=cloneState(st);
+  var r=resolveTurn(s, firstPCard, firstCCard);
+  if(r.over) return r.winner;
+  var guard=0;
+  while(guard++<40){
+    if(checkBothStuck(s)) return finalWinner(s);
+    var pc=randomLegal(s.pHand,s.pSta,s.turn);
+    var cc=randomLegal(s.cHand,s.cSta,s.turn);
+    if(!pc && !cc) return finalWinner(s);
+    var rr=resolveTurn(s,pc,cc);
+    if(rr.over) return rr.winner;
+  }
+  return finalWinner(s);
+}
+/* ============ 難易度 ============ */
+var difficulty="normal";
+/* ============ オンライン対戦の状態 ============ */
+var gameMode="cpu"; /* 'cpu' | 'online' */
+var OPP_NAME="CPU";
+var peer=null, conn=null, onlineRole=null, roomCode=null, onlineConnected=false;
+var currentGameId=0;
+var myPickSent=null; /* {turn, gameId, cardId, uid} */
+var remotePicks={}; /* "gameId:turn" -> cardId (null=パス) */
+function pickKey(gid,turn){ return gid+":"+turn; }
+function remoteHasCurrent(){
+  var k=pickKey(currentGameId, G?G.turn:0);
+  return Object.prototype.hasOwnProperty.call(remotePicks,k);
+}
+var DIFFS={
+  easy:{label:"かんたん", sims:0, tol:0, desc:"かんたん：CPUは出せるカードからランダムに選びます。ルールに慣れる練習用で、勝てるのが普通です。"},
+  normal:{label:"ふつう", sims:15, tol:0.15, desc:"ふつう：CPUは1手あたり15回ほどシミュレーションして読みますが、最良手と僅差（0.15以内）の手も混ぜるので、たまに甘い手を打ちます。"},
+  strong:{label:"つよい", sims:70, tol:0.05, desc:"つよい：CPUは1手あたり70回シミュレーションして最良手を狙います。僅差（0.05以内）の手だけ少し混ぜます。"}
+};
+function chooseCpuCard(st){
+  var cands=legalCards(st.cHand,st.cSta,st.turn);
+  if(!cands.length) return null;
+  if(cands.length===1) return cands[0];
+  var cfg=DIFFS[difficulty]||DIFFS.normal;
+  if(cfg.sims===0){
+    return cands[Math.floor(Math.random()*cands.length)];
+  }
+  var SIMS=cfg.sims;
+  var scored=cands.map(function(cand){
+    var total=0;
+    for(var i=0;i<SIMS;i++){
+      var pMove=randomLegal(st.pHand,st.pSta,st.turn);
+      var w=simulateGame(st,pMove,cand);
+      total += (w==='c'?1:(w==='draw'?0.5:0));
+    }
+    return {card:cand, score:total/SIMS};
+  });
+  var best=-1; scored.forEach(function(s){ if(s.score>best) best=s.score; });
+  var near=scored.filter(function(s){ return best-s.score<=cfg.tol; });
+  return near[Math.floor(Math.random()*near.length)].card;
+}
+function renderDiff(){
+  var cfg=DIFFS[difficulty]||DIFFS.normal;
+  var btns=document.querySelectorAll('.diffbtn');
+  btns.forEach(function(b){
+    var on=b.getAttribute('data-diff')===difficulty;
+    b.classList.toggle('active',on);
+    b.setAttribute('aria-checked', on?"true":"false");
+  });
+  document.getElementById('diffDesc').textContent=cfg.desc+" 難易度はいつでも変更できて、対局中なら次のCPUの手から、対局後なら次の一局から反映されます。";
+  document.getElementById('cpuDiffChip').textContent="難易度："+cfg.label;
+}
+
+/* ============ 実ゲーム状態とUI ============ */
+var G=null;
+var selectedUid=null;
+var busy=false;
+var inspectSide=null; /* 'p' | 'c' */
+var inspectUid=null;
+function newGame(){
+  clearAnimTimers(); animCtx=null;
+  document.body.classList.remove('is-animating');
+  var ba=document.getElementById('battleArea'); if(ba) ba.classList.remove('is-animating');
+  var fx=document.getElementById('climaxFx'); if(fx) fx.hidden=true;
+  uidSeq=1;
+  G={ pHand:initialHand(), cHand:initialHand(), pSta:20, cSta:20, pMom:0, cMom:0, turn:1, pDebuff:false, cDebuff:false };
+  selectedUid=null; busy=false; inspectSide=null; inspectUid=null;
+  document.getElementById('logEl').innerHTML="";
+  document.getElementById('gameoverBox').hidden=true;
+  document.getElementById('resultBox').innerHTML="";
+  closeDrawer();
+  clearSlots();
+  render();
+}
+function clearSlots(){
+  document.getElementById('playerSlot').className="slot";
+  document.getElementById('playerSlot').innerHTML='<span class="hint">あなたのカードは<br>ここに出ます</span>';
+  document.getElementById('cpuSlot').className="slot";
+  document.getElementById('cpuSlot').innerHTML='<span class="hint">CPUのカードは<br>ここに出ます</span>';
+}
+function stars(n){ return n? "★".repeat(Math.min(n,8)) : "—"; }
+function tileHTML(c){
+  var d=DEFS[c.id];
+  return '<span class="cost">'+d.cost+'</span>'+
+    (d.power===null?'<span class="pow none">なし</span>':'<span class="pow">'+d.power+'</span>')+
+    '<span class="emoji">'+d.emoji+'</span><span class="cname">'+d.name+'</span><span class="eff">'+d.short+'</span>';
+}
+/* 詳細欄専用の構造化した効果文（タイルの短い文・ゲーム判定とは別。意味は元のルールと同一） */
+var EFF_DETAIL={
+  1:[{plain:"効果なし",muted:true}],
+  2:[{plain:"効果なし",muted:true}],
+  3:[{plain:"効果なし",muted:true}],
+  4:[{plain:"効果なし",muted:true}],
+  5:[{label:"勝利時",text:"『ギャフベロハギャベブ』を <strong class=\"key\">1枚手札に加える</strong>"}],
+  6:[{label:"勝利時",text:"『ギャフベロハギャベブ』を <strong class=\"key\">1枚手札に加える</strong>"}],
+  7:[{label:"出すだけで発動",text:"<strong class=\"key\">勝敗は関係ない</strong>"},{label:"次のターン",text:"相手のカードのパワーを <strong class=\"hl\">-1</strong> する"}],
+  8:[{label:"相手が『ギャフベロハギャベブ』を出していたら",text:"それを<strong class=\"hl\">無効化</strong>し、自分が『ギャフベロハギャベブ』を <strong class=\"key\">1枚得る</strong>。その時は<strong class=\"hl\">勢いを得られない</strong>"},{label:"通常カード相手なら",text:"パワー5で普通に勝負する"}],
+  9:[{plain:"このカードは<strong class=\"hl\">絶対に勝利できない</strong>"},{label:"相手がこのカードに勝っても",text:"<strong class=\"hl\">勢いを得られず</strong>、<strong class=\"hl\">勝利時効果も発動しない</strong>"}],
+  10:[{plain:"攻撃カードではないので、<strong class=\"key\">パワー勝負はしない</strong>"},{plain:"ゲームが即終了し、その時点で<strong class=\"key\">勢いが多い方の勝ち</strong>。同点なら引き分け"},{plain:"両者が同時に出したら、何も起きず続行"},{plain:"<strong class=\"hl\">猫パンチ!</strong> にだけ無効化される"}]
+};
+function effDetailHTML(id){
+  var items=EFF_DETAIL[id]||[{plain:DEFS[id].eff}];
+  return items.map(function(it){
+    if(it.label){
+      return '<div class="d-effitem"><span class="d-efflabel">'+it.label+'</span><span class="d-efftext">'+it.text+'</span></div>';
+    }
+    return '<div class="d-effitem"><span class="d-effplain'+(it.muted?' muted':'')+'">'+it.plain+'</span></div>';
+  }).join("");
+}
+function renderDetail(){
+  var box=document.getElementById('detailBox');
+  var card=null, isP=false, stamina=0;
+  if(inspectSide==='p'){ card=G.pHand.find(function(c){return c.uid===inspectUid;}); isP=true; stamina=G.pSta; }
+  if(inspectSide==='c'){ card=G.cHand.find(function(c){return c.uid===inspectUid;}); stamina=G.cSta; }
+  if(!card){
+    box.innerHTML='<div class="bigcard placeholder"><span class="bc-ph-icon">👆</span><span class="bc-ph-title">カードの拡大図</span><span class="bc-ph-text">手札のカードをタップすると、ここにそのカードが大きく表示されます。自分のカードはタップでそのまま選択もできます。</span></div>';
+    return;
+  }
+  var d=DEFS[card.id];
+  var reason=unplayableReason(card, stamina, G.turn);
+  var isSelected=isP && selectedUid===card.uid;
+  var selNote = isP ? (isSelected ? '<div class="d-note selected">▶ 選択中：下の「このカードで勝負！」で確定できます</div>' : (reason ? '' : (busy ? '' : '<div class="d-note">タップでこのカードを選択できます</div>'))) : '<div class="d-note">'+OPP_NAME+'のカードです（操作はできません）</div>';
+  box.innerHTML='<div class="bigcard'+(isSelected?' selected':'')+'">'+
+    '<span class="bc-cost" title="コスト">'+d.cost+'</span>'+
+    (d.power===null?'<span class="bc-pow none">パワーなし</span>':'<span class="bc-pow" title="パワー">'+d.power+'</span>')+
+    '<span class="bc-owner">'+(isP?'🐱 あなたのカード':'😼 '+OPP_NAME+'のカード')+(isSelected?' ・ 選択中':'')+'</span>'+
+    '<div class="bc-name">'+d.name+'</div>'+
+    '<div class="bc-art" aria-hidden="true">'+d.emoji+'</div>'+
+    '<div class="bc-eff">'+effDetailHTML(card.id)+'</div>'+
+    '</div>'+
+    (reason?'<div class="d-reason"><span aria-hidden="true">⛔</span><span>今は出せません：'+reason+'</span></div>':'')+
+    selNote;
+}
+function render(){
+  document.getElementById('turnLabel').textContent="ターン "+G.turn;
+  document.getElementById('cpuStaminaNum').textContent=G.cSta;
+  document.getElementById('cpuBar').style.width=(G.cSta/20*100)+"%";
+  document.getElementById('cpuBarWrap').className="bar ms-bar"+(G.cSta<=5?" low":"");
+  document.getElementById('cpuMomNum').textContent=G.cMom;
+  document.getElementById('cpuMomStars').textContent=stars(G.cMom);
+  document.getElementById('cpuDebuff').hidden=!G.cDebuff;
+  var cpuLegal=legalCards(G.cHand,G.cSta,G.turn);
+  var cpuLegalUids={}; cpuLegal.forEach(function(c){cpuLegalUids[c.uid]=true;});
+  var cpuHandEl=document.getElementById('cpuHandEl');
+  cpuHandEl.innerHTML="";
+  G.cHand.forEach(function(c){
+    var playable=!!cpuLegalUids[c.uid];
+    var b=document.createElement('button');
+    b.type="button";
+    b.className="card cpu-card"+(playable?"":" unplayable")+((inspectSide==='c'&&inspectUid===c.uid)?" inspected":"");
+    b.setAttribute('aria-label',"CPUのカード "+DEFS[c.id].name+(playable?"":"（今は出せません）"));
+    b.innerHTML=tileHTML(c);
+    b.addEventListener('click',function(){ inspectSide='c'; inspectUid=c.uid; render(); });
+    cpuHandEl.appendChild(b);
+  });
+  if(!G.cHand.length){ cpuHandEl.innerHTML='<span class="empty-note">CPUの手札はもうありません</span>'; }
+  document.getElementById('playerStaminaNum').textContent=G.pSta;
+  document.getElementById('playerBar').style.width=(G.pSta/20*100)+"%";
+  document.getElementById('playerBarWrap').className="bar ms-bar"+(G.pSta<=5?" low":"");
+  document.getElementById('playerMomNum').textContent=G.pMom;
+  document.getElementById('playerMomStars').textContent=stars(G.pMom);
+  document.getElementById('playerDebuff').hidden=!G.pDebuff;
+
+  var legal=legalCards(G.pHand,G.pSta,G.turn);
+  var legalUids={}; legal.forEach(function(c){legalUids[c.uid]=true;});
+  var handEl=document.getElementById('handEl');
+  handEl.innerHTML="";
+  G.pHand.forEach(function(c){
+    var playable=!!legalUids[c.uid];
+    var b=document.createElement('button');
+    b.type="button";
+    b.className="card"+(selectedUid===c.uid?" selected":"")+((inspectSide==='p'&&inspectUid===c.uid&&selectedUid!==c.uid)?" inspected":"")+(playable?"":" unplayable");
+    b.setAttribute('aria-label',"あなたのカード "+DEFS[c.id].name+(playable?"":"（今は出せません）"));
+    b.innerHTML=tileHTML(c);
+    b.addEventListener('click',function(){
+      inspectSide='p'; inspectUid=c.uid;
+      if(playable && !busy) selectedUid=c.uid;
+      render();
+    });
+    handEl.appendChild(b);
+  });
+  if(!G.pHand.length){ handEl.innerHTML='<span class="empty-note">あなたの手札はもうありません</span>'; }
+  document.getElementById('handHint').textContent =
+    busy ? "結果を確認して「次のターンへ」を押してね" :
+    G.turn===1 ? "初ターンはコスト4以下だけ" :
+    legal.length? "タップで選択 →「勝負！」" : "出せるカードがありません";
+
+  var confirmBtn=document.getElementById('confirmBtn');
+  confirmBtn.disabled = busy || selectedUid===null || !legal.length;
+  confirmBtn.hidden = busy || !legal.length;
+  var soloBtn=document.getElementById('soloBtn');
+  soloBtn.hidden = busy || legal.length>0;
+  soloBtn.textContent = gameMode==='online' ? "パスする（出せるカードなし）" : "相手のターンを見る";
+  document.getElementById('phaseLabel').textContent =
+    (gameMode==='online' && myPickSent && myPickSent.turn===G.turn) ? "送信済み！ 相手が選ぶのを待ってるよ…" :
+    busy? "公開中…" : (!legal.length? "あなたはパス（出せるカードなし）" :
+    (gameMode==='online' && remoteHasCurrent()) ? "相手はカードを選んだよ。あなたの番！" :
+    (selectedUid? "そのカードでいい？ 確定してね" : "カードを選んでね"));
+  renderDetail();
+}
+function cardHTML(c, debuffed){
+  if(!c) return '<span class="hint">パス<br>（出せるカードなし）</span>';
+  var d=DEFS[c.id];
+  var powTxt = d.power===null? "パワーなし" : ("実効パワー "+(d.power+(debuffed?-1:0))+(debuffed?"（-1中）":""));
+  return '<div class="card mini"><span class="cost">'+d.cost+'</span>'+
+    (d.power===null?'<span class="pow none">なし</span>':'<span class="pow">'+d.power+'</span>')+
+    (debuffed && d.power!==null?'<span class="debuff-badge">パワー-1</span>':'')+
+    '<span class="emoji">'+d.emoji+'</span><span class="cname">'+d.name+'</span><span class="eff">'+powTxt+'</span></div>';
+}
+/* 裏向きカード（裏面デザイン）→ 同時フリップ用のHTML。表はフリップ後に初めて見える */
+function flipHTML(c, debuffed, fromTop){
+  if(!c) return '<span class="hint">パス<br>（出せるカードなし）</span>';
+  return '<div class="flip-scene"><div class="flip-outer'+(fromTop?' from-top':'')+'"><div class="flip-card">'+
+    '<div class="flip-face back"><div class="card-back" aria-label="裏向きのカード"><span class="back-paw">🐾</span><span class="back-txt">NEKO</span></div></div>'+
+    '<div class="flip-face front">'+cardHTML(c,debuffed)+'</div>'+
+    '</div></div></div>';
+}
+function addLog(turn, pCard, cCard, msgs){
+  var li=document.createElement('li');
+  li.innerHTML='<span class="t">T'+turn+'</span><span>あなた：'+(pCard?cardName(pCard.id):"パス")+' ／ '+OPP_NAME+'：'+(cCard?cardName(cCard.id):"パス")+'<br>'+msgs.map(function(m){return "・"+m;}).join("<br>")+'</span>';
+  var log=document.getElementById('logEl');
+  if(log.querySelector('.hint')) log.innerHTML="";
+  log.prepend(li);
+}
+function showResult(msgs, winner){
+  var box=document.getElementById('resultBox');
+  box.innerHTML=msgs.map(function(m,i){ return '<p class="'+(i===msgs.length-1?'big':'')+'">'+m+'</p>'; }).join("");
+}
+function endGame(winner){
+  busy=true;
+  render();
+  document.getElementById('confirmBtn').hidden=true;
+  document.getElementById('nextBtn').hidden=true;
+  document.getElementById('soloBtn').hidden=true;
+  var box=document.getElementById('gameoverBox'); box.hidden=false;
+  var face=document.getElementById('goFace'), title=document.getElementById('goTitle');
+  if(winner==='p'){ face.textContent="🏆😻"; title.textContent="あなたの勝ち！"; }
+  else if(winner==='c'){ face.textContent="😿"; title.textContent=OPP_NAME+"の勝ち…"; }
+  else { face.textContent="🤝"; title.textContent="引き分け"; }
+  document.getElementById('goDetail').textContent="最終勢い — あなた "+G.pMom+" ／ "+OPP_NAME+" "+G.cMom+"（ターン "+(G.turn-1)+" で終了）";
+  document.getElementById('phaseLabel').textContent="対戦終了";
+  if(winner==='p'){
+    var wrap=document.createElement('span'); wrap.className='go-stars'; wrap.setAttribute('aria-hidden','true');
+    for(var i=0;i<7;i++){
+      var st=document.createElement('i'); st.textContent='★';
+      st.style.left=(6+i*13+((i*37)%9))+'%';
+      st.style.fontSize=(13+((i*29)%10))+'px';
+      st.style.animationDelay=(i*0.13)+'s';
+      wrap.appendChild(st);
+    }
+    box.appendChild(wrap);
+  }
+}
+/* ============ 公開演出（裏向き→同時フリップ→結果） ============ */
+var animTimers=[];
+var animCtx=null; /* 演出中の文脈。結果はフリップ完了まで確定表示しない */
+function clearAnimTimers(){ animTimers.forEach(function(t){clearTimeout(t);}); animTimers=[]; }
+function later(fn, ms){ animTimers.push(setTimeout(fn, ms)); }
+function flipBothCards(instant){
+  var cards=document.querySelectorAll('#playerSlot .flip-card, #cpuSlot .flip-card');
+  cards.forEach(function(el){ if(instant) el.classList.add('instant'); el.classList.add('flipped'); });
+}
+function playTurn(pCard){
+  if(busy) return;
+  var cCard=chooseCpuCard(G);
+  startReveal(pCard, cCard);
+}
+/* 両者のカードが揃った時に呼ぶ共通の公開演出。pCard=あなた、cCard=相手（CPU／オンライン共通） */
+function startReveal(pCard, cCard){
+  busy=true;
+  document.getElementById('nextBtn').hidden=true;
+  document.getElementById('soloBtn').hidden=true;
+  document.getElementById('confirmBtn').hidden=true;
+  document.getElementById('resultBox').innerHTML="";
+  document.getElementById('climaxFx').hidden=true;
+  document.getElementById('phaseLabel').textContent="カードが場に出る…！（タップでスキップ）";
+  var turnBefore=G.turn, pDebBefore=G.pDebuff, cDebBefore=G.cDebuff;
+  var pMomBefore=G.pMom, cMomBefore=G.cMom;
+  animCtx={pCard:pCard, cCard:cCard, turnBefore:turnBefore, pDebBefore:pDebBefore, cDebBefore:cDebBefore,
+    pMomBefore:pMomBefore, cMomBefore:cMomBefore, flipped:false, done:false, startedAt:Date.now()};
+  /* 両者のカードが裏向きで、それぞれの手札側からスロットへ滑って出る */
+  var ps=document.getElementById('playerSlot'); ps.className="slot filled"; ps.innerHTML=flipHTML(pCard,pDebBefore,false);
+  var cs=document.getElementById('cpuSlot'); cs.className="slot filled"; cs.innerHTML=flipHTML(cCard,cDebBefore,true);
+  document.body.classList.add('is-animating');
+  document.getElementById('battleArea').classList.add('is-animating');
+  /* 少し溜めてから、両カード同時にフリップ（片方だけ先に開くことはしない） */
+  later(function(){
+    if(!animCtx || animCtx.done) return;
+    animCtx.flipped=true;
+    flipBothCards(false);
+  }, 560);
+  later(function(){ finishReveal(false); }, 1120);
+}
+/* フリップ完了（またはスキップ）で初めて結果を確定表示する */
+function finishReveal(skipped){
+  if(!animCtx || animCtx.done) return;
+  animCtx.done=true;
+  clearAnimTimers();
+  if(!animCtx.flipped){ animCtx.flipped=true; flipBothCards(true); }
+  var ctx=animCtx; animCtx=null;
+  document.body.classList.remove('is-animating');
+  document.getElementById('battleArea').classList.remove('is-animating');
+  var r=resolveTurn(G, ctx.pCard, ctx.cCard);
+  if(gameMode==='online'){ r.msgs=r.msgs.map(function(m){ return m.split('CPU').join('相手'); }); }
+  selectedUid=null;
+  addLog(ctx.turnBefore, ctx.pCard, ctx.cCard, r.msgs);
+  showResult(r.msgs);
+  render();
+  applyResultFx(ctx, r);
+  /* スタミナバー（幅トランジション）と勢い表示はこのタイミングでだけ動く */
+  popStats(ctx);
+  if(r.over){ endGame(r.winner); return; }
+  if(checkBothStuck(G)){
+    var w=finalWinner(G);
+    var msg="両者とも出せるカードがなくなった。勢い "+G.pMom+" 対 "+G.cMom+" で終了！";
+    showResult(r.msgs.concat([msg]));
+    addLog(G.turn,null,null,[msg]);
+    endGame(w); return;
+  }
+  document.getElementById('nextBtn').hidden=false;
+  document.getElementById('confirmBtn').hidden=true;
+  document.getElementById('soloBtn').hidden=true;
+  document.getElementById('phaseLabel').textContent="結果を確認して次へ";
+}
+/* 勝敗・特殊決着に応じたカード演出とバッジ */
+function applyResultFx(ctx, r){
+  var pCard=ctx.pCard, cCard=ctx.cCard;
+  var pFlip=document.querySelector('#playerSlot .flip-card');
+  var cFlip=document.querySelector('#cpuSlot .flip-card');
+  var pSlot=document.getElementById('playerSlot'), cSlot=document.getElementById('cpuSlot');
+  function badge(slot, cls, txt){ if(!slot) return; var s=document.createElement('span'); s.className='fx-badge '+cls; s.textContent=txt; slot.appendChild(s); }
+  function momPop(slot){ if(!slot) return; var s=document.createElement('span'); s.className='mom-pop'; s.textContent='勢い+1 ★'; slot.appendChild(s); }
+  var pGyaf=pCard&&pCard.id===10, cGyaf=cCard&&cCard.id===10;
+  var punch = (pGyaf&&cCard&&cCard.id===8)||(cGyaf&&pCard&&pCard.id===8);
+  if(punch){
+    var gyafFlip=pGyaf?pFlip:cFlip, gyafSlot=pGyaf?pSlot:cSlot, punchFlip=pGyaf?cFlip:pFlip, punchSlot=pGyaf?cSlot:pSlot;
+    if(gyafFlip) gyafFlip.classList.add('fx-shatter');
+    badge(gyafSlot,'burst','💥 切り札 無効化！');
+    if(punchFlip) punchFlip.classList.add('fx-win');
+    badge(punchSlot,'shield','🐾 切り札ゲット！');
+    return;
+  }
+  if((pGyaf||cGyaf) && !(pGyaf&&cGyaf)){
+    showClimaxFx(r.winner);
+    if(r.winner==='p'){ if(pFlip) pFlip.classList.add('fx-win'); if(cFlip) cFlip.classList.add('fx-lose'); }
+    else if(r.winner==='c'){ if(cFlip) cFlip.classList.add('fx-win'); if(pFlip) pFlip.classList.add('fx-lose'); }
+    else { if(pFlip) pFlip.classList.add('fx-draw-l'); if(cFlip) cFlip.classList.add('fx-draw-r'); }
+    return;
+  }
+  if(pGyaf&&cGyaf){
+    if(pFlip) pFlip.classList.add('fx-draw-l'); if(cFlip) cFlip.classList.add('fx-draw-r');
+    return;
+  }
+  if(!pCard||!cCard){
+    /* ソロターン：出した側だけ軽く勝利演出（フーは絶対に勝てないので演出なし） */
+    var soloFlip=pCard?pFlip:cFlip, soloSlot=pCard?pSlot:cSlot, soloCard=pCard||cCard;
+    var gained = pCard ? (G.pMom>ctx.pMomBefore) : (G.cMom>ctx.cMomBefore);
+    if(soloCard && soloCard.id===10){ showClimaxFx(r.winner); }
+    if(gained){ if(soloFlip) soloFlip.classList.add('fx-win'); momPop(soloSlot); }
+    return;
+  }
+  var ep=DEFS[pCard.id].power+(ctx.pDebBefore?-1:0);
+  var ec=DEFS[cCard.id].power+(ctx.cDebBefore?-1:0);
+  var winner=null;
+  if(ep>ec&&pCard.id!==9) winner='p'; else if(ec>ep&&cCard.id!==9) winner='c';
+  var fooBlock = winner && ((winner==='p'&&cCard.id===9)||(winner==='c'&&pCard.id===9));
+  if(!winner){
+    if(pFlip) pFlip.classList.add('fx-draw-l');
+    if(cFlip) cFlip.classList.add('fx-draw-r');
+    return;
+  }
+  var winFlip=winner==='p'?pFlip:cFlip, loseFlip=winner==='p'?cFlip:pFlip;
+  var winSlot=winner==='p'?pSlot:cSlot, loseSlot=winner==='p'?cSlot:pSlot;
+  if(winFlip) winFlip.classList.add('fx-win');
+  if(loseFlip) loseFlip.classList.add('fx-lose');
+  if(fooBlock){
+    badge(loseSlot,'shield','🛡 フーで阻止！');
+  }else{
+    momPop(winSlot);
+  }
+}
+function popStats(ctx){
+  var areas=document.querySelectorAll('.ministatus');
+  /* 勢いが増えた側のステータスだけポップさせる（場所は各手札エリアのまま） */
+  if(G.pMom>ctx.pMomBefore && areas[1]){ areas[1].classList.remove('stat-pop'); void areas[1].offsetWidth; areas[1].classList.add('stat-pop'); }
+  if(G.cMom>ctx.cMomBefore && areas[0]){ areas[0].classList.remove('stat-pop'); void areas[0].offsetWidth; areas[0].classList.add('stat-pop'); }
+}
+function showClimaxFx(winner){
+  var fx=document.getElementById('climaxFx');
+  document.getElementById('climaxFxText').textContent = winner==='draw' ? '👑 クライマックス！ 同点…' : '👑 クライマックス！';
+  fx.hidden=false;
+  fx.classList.remove('climax-fx'); void fx.offsetWidth; fx.classList.add('climax-fx');
+  setTimeout(function(){ fx.hidden=true; }, 1350);
+}
+/* 演出中にバトルエリアをタップしたら結果表示までスキップ（勝負ボタン自身のクリック伝播は除外） */
+document.getElementById('battleArea').addEventListener('click',function(e){
+  if(!animCtx || animCtx.done) return;
+  if(e.target.closest('button')) return;
+  if(Date.now()-animCtx.startedAt<250) return;
+  finishReveal(true);
+});
+/* ===== 履歴ドロワー ===== */
+function openDrawer(){
+  document.getElementById('historyDrawer').hidden=false;
+  document.getElementById('drawerBackdrop').hidden=false;
+}
+function closeDrawer(){
+  var d=document.getElementById('historyDrawer'); if(d) d.hidden=true;
+  var b=document.getElementById('drawerBackdrop'); if(b) b.hidden=true;
+}
+/* ===== ルール画面 ===== */
+var CARD_TAGS={5:"勝てば切り札",6:"勝てば切り札",7:"特殊",8:"特殊",9:"特殊",10:"切り札"};
+function buildGallery(){
+  var g=document.getElementById('cardGallery');
+  if(!g || g.childElementCount) return;
+  [1,2,3,4,5,6,7,8,9,10].forEach(function(id){
+    var d=DEFS[id];
+    var el=document.createElement('div');
+    el.className='gcard';
+    el.innerHTML='<span class="g-cost" title="コスト">'+d.cost+'</span>'+
+      '<div class="g-top"><span class="g-emoji" aria-hidden="true">'+d.emoji+'</span><span class="g-name">'+d.name+'</span>'+
+      (CARD_TAGS[id]?'<span class="g-tag">🏷 '+CARD_TAGS[id]+'</span>':'')+
+      (d.power===null?'<span class="g-pow none">パワーなし</span>':'<span class="g-pow">パワー '+d.power+'</span>')+'</div>'+
+      effDetailHTML(id);
+    g.appendChild(el);
+  });
+}
+function openRules(){
+  buildGallery();
+  closeDrawer();
+  document.getElementById('rulesModal').hidden=false;
+  document.getElementById('rulesBackdrop').hidden=false;
+  document.getElementById('rulesModal').scrollTop=0;
+}
+function closeRules(){
+  var m=document.getElementById('rulesModal'); if(m) m.hidden=true;
+  var b=document.getElementById('rulesBackdrop'); if(b) b.hidden=true;
+}
+document.getElementById('rulesBtn').addEventListener('click',openRules);
+document.getElementById('rulesFromHistory').addEventListener('click',openRules);
+document.getElementById('rulesClose').addEventListener('click',closeRules);
+document.getElementById('rulesBackdrop').addEventListener('click',closeRules);
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeRules(); closeDrawer(); closeOnlineModal(); } });
+document.getElementById('historyBtn').addEventListener('click',openDrawer);
+document.getElementById('drawerClose').addEventListener('click',closeDrawer);
+document.getElementById('drawerBackdrop').addEventListener('click',closeDrawer);
+document.getElementById('confirmBtn').addEventListener('click',function(){
+  var card=G.pHand.find(function(c){return c.uid===selectedUid;});
+  if(!card) return;
+  if(gameMode==='online'){ sendPick(card); } else { playTurn(card); }
+});
+document.getElementById('soloBtn').addEventListener('click',function(){
+  if(gameMode==='online'){ sendPick(null); } else { playTurn(null); }
+});
+document.getElementById('nextBtn').addEventListener('click',function(){
+  busy=false;
+  document.getElementById('nextBtn').hidden=true;
+  document.getElementById('resultBox').innerHTML="";
+  clearSlots();
+  render();
+  /* シャーの-1は次ターン開始時に小さく知らせる（デバフ表示をパルス＋一言） */
+  if(G.pDebuff||G.cDebuff){
+    var who=G.pDebuff?"あなた":OPP_NAME;
+    document.getElementById('resultBox').innerHTML='<p class="debuff-note">😾 シャー！ このターン、'+who+'のパワーは -1 される</p>';
+    var pill=document.getElementById(G.pDebuff?'playerDebuff':'cpuDebuff');
+    if(pill){ pill.classList.remove('pulse'); void pill.offsetWidth; pill.classList.add('pulse'); }
+  }
+  if(checkBothStuck(G)){ endGame(finalWinner(G)); }
+});
+document.getElementById('againBtn').addEventListener('click',function(){
+  if(gameMode==='online' && onlineConnected){ requestOnlineRestart(); } else { newGame(); }
+});
+document.getElementById('restartTop').addEventListener('click',function(){
+  if(gameMode==='online' && onlineConnected){ requestOnlineRestart(); } else { newGame(); }
+});
+document.querySelectorAll('.diffbtn').forEach(function(b){
+  b.addEventListener('click',function(){
+    difficulty=b.getAttribute('data-diff');
+    renderDiff();
+  });
+});
+/* ============ オンライン対戦（PeerJS / WebRTC・端末同士の直接接続） ============ */
+var PEER_PREFIX="nekonokenka-v1-";
+function setLobbyStatus(t){ document.getElementById('lobbyStatus').textContent=t; }
+function openOnlineModal(){
+  document.getElementById('onlineModal').hidden=false;
+  document.getElementById('onlineBackdrop').hidden=false;
+  document.getElementById('onlineModal').scrollTop=0;
+}
+function closeOnlineModal(){
+  var m=document.getElementById('onlineModal'); if(m) m.hidden=true;
+  var b=document.getElementById('onlineBackdrop'); if(b) b.hidden=true;
+}
+function genRoomCode(){
+  var chars="ABCDEFGHJKMNPQRSTUVWXYZ23456789", s="";
+  for(var i=0;i<6;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function updateOnlineUI(){
+  var pill=document.getElementById('onlinePill');
+  var btn=document.getElementById('onlineBtn');
+  if(onlineConnected){
+    pill.hidden=false;
+    document.getElementById('onlinePillText').textContent="オンライン対戦中（ルーム "+roomCode+"）";
+    btn.textContent="📴 切断する";
+    btn.classList.add('connected');
+    document.getElementById('diffSeg').style.display="none";
+    document.getElementById('cpuDiffChip').textContent="オンライン対戦";
+  }else{
+    pill.hidden=true;
+    btn.textContent="🌐 オンライン対戦";
+    btn.classList.remove('connected');
+    document.getElementById('diffSeg').style.display="";
+    renderDiff();
+  }
+  document.getElementById('oppNameLabel').textContent = gameMode==='online' ? "相手の手札" : "CPUの手札";
+  document.getElementById('oppAvatar').textContent = gameMode==='online' ? "🐱" : "😼";
+}
+function sendMsg(obj){
+  try{ if(conn && conn.open) conn.send(obj); }catch(e){}
+}
+function applyOnlineStart(gid, note){
+  currentGameId=gid;
+  gameMode='online'; OPP_NAME="相手";
+  myPickSent=null; remotePicks={};
+  newGame();
+  closeOnlineModal();
+  updateOnlineUI();
+  render();
+  if(note) document.getElementById('resultBox').innerHTML='<p class="big">'+note+'</p>';
+}
+function startHostedGame(){
+  var gid=currentGameId+1;
+  applyOnlineStart(gid, "🌐 オンライン対戦スタート！ 相手とつながったよ。カードを選んでね");
+  sendMsg({type:'start', gameId:gid});
+}
+function requestOnlineRestart(){
+  var gid=currentGameId+1;
+  sendMsg({type:'restart', gameId:gid});
+  applyOnlineStart(gid, "🌐 新しい対局を始めたよ（相手にも同期済み）");
+}
+function sendPick(card){
+  if(busy || !onlineConnected) return;
+  if(myPickSent && myPickSent.turn===G.turn) return;
+  myPickSent={turn:G.turn, gameId:currentGameId, cardId:card?card.id:null, uid:card?card.uid:null};
+  busy=true;
+  selectedUid=null;
+  sendMsg({type:'pick', gameId:currentGameId, turn:G.turn, cardId:card?card.id:null});
+  render();
+  tryOnlineReveal();
+}
+function tryOnlineReveal(){
+  if(!myPickSent || myPickSent.turn!==G.turn || myPickSent.gameId!==currentGameId) return;
+  var k=pickKey(currentGameId, G.turn);
+  if(!Object.prototype.hasOwnProperty.call(remotePicks,k)) return;
+  var remoteId=remotePicks[k];
+  delete remotePicks[k];
+  var myCard = myPickSent.uid!=null ? (G.pHand.find(function(c){return c.uid===myPickSent.uid;})||null)
+                                    : (myPickSent.cardId!=null ? (G.pHand.find(function(c){return c.id===myPickSent.cardId;})||null) : null);
+  var oppCard = remoteId!=null ? (G.cHand.find(function(c){return c.id===remoteId;})||null) : null;
+  myPickSent=null;
+  startReveal(myCard, oppCard);
+}
+function handleOnlineData(msg){
+  if(!msg || !msg.type) return;
+  if(msg.type==='start'){
+    if(gameMode==='online' && onlineConnected && currentGameId===msg.gameId) return;
+    applyOnlineStart(msg.gameId, "🌐 オンライン対戦スタート！ 相手とつながったよ。カードを選んでね");
+  }
+  else if(msg.type==='restart'){
+    applyOnlineStart(msg.gameId, "🌐 相手が新しい対局を始めたよ");
+  }
+  else if(msg.type==='pick'){
+    if(msg.gameId!==currentGameId) return;
+    remotePicks[pickKey(msg.gameId, msg.turn)] = (msg.cardId==null?null:msg.cardId);
+    if(busy && !animCtx){ /* 自分は送信済みで待機中 */ tryOnlineReveal(); }
+    else if(!busy){ render(); }
+    else { tryOnlineReveal(); }
+  }
+  else if(msg.type==='bye'){
+    onOnlinePeerGone("相手が切断しました");
+  }
+}
+function onOnlinePeerGone(reason){
+  if(!onlineConnected && gameMode!=='online') return;
+  onlineConnected=false;
+  cleanupPeer();
+  gameMode='cpu'; OPP_NAME="CPU";
+  myPickSent=null; remotePicks={};
+  clearAnimTimers(); animCtx=null;
+  document.body.classList.remove('is-animating');
+  var ba=document.getElementById('battleArea'); if(ba) ba.classList.remove('is-animating');
+  newGame();
+  updateOnlineUI();
+  render();
+  document.getElementById('resultBox').innerHTML='<p class="big">📴 '+reason+'。CPU対戦に戻りました。</p>';
+  document.getElementById('phaseLabel').textContent="CPU対戦に戻りました";
+}
+function cleanupPeer(){
+  try{ if(conn) conn.close(); }catch(e){}
+  try{ if(peer) peer.destroy(); }catch(e){}
+  conn=null; peer=null; onlineRole=null;
+}
+function peerErrorMessage(err){
+  var t=err && err.type ? err.type : "";
+  if(t==='peer-unavailable') return "そのコードの部屋が見つかりませんでした。コードと、相手が部屋を作って待っているかを確認してね。";
+  if(t==='unavailable-id') return "そのコードは今使われています。もう一度「部屋を作る」を押してね。";
+  if(t==='network' || t==='server-error') return "通信サーバーにつながりませんでした。ネット接続を確認して、少し待ってからもう一度試してね。";
+  if(t==='browser-incompatible') return "このブラウザはオンライン対戦（WebRTC）に対応していません。";
+  return "接続でエラーが起きました（"+(t||'不明')+"）。もう一度試してね。";
+}
+function bindConn(c){
+  conn=c;
+  c.on('open',function(){
+    onlineConnected=true;
+    if(onlineRole==='host'){
+      setLobbyStatus("相手が入ってきた！ 対戦を始めます…");
+      startHostedGame();
+    }else{
+      setLobbyStatus("部屋につながった！ 対戦開始を待っています…");
+      sendMsg({type:'hello'});
+    }
+    updateOnlineUI();
+  });
+  c.on('data',handleOnlineData);
+  c.on('close',function(){ onOnlinePeerGone("相手との接続が切れました"); });
+  c.on('error',function(err){ setLobbyStatus(peerErrorMessage(err)); });
+}
+function createRoom(){
+  if(typeof Peer==="undefined"){ setLobbyStatus("通信ライブラリを読み込めませんでした。ネット接続を確認してページを再読み込みしてね。"); return; }
+  cleanupPeer();
+  onlineConnected=false;
+  roomCode=genRoomCode();
+  onlineRole='host';
+  document.getElementById('roomCodeText').textContent=roomCode;
+  document.getElementById('roomCodeBox').hidden=false;
+  setLobbyStatus("部屋を作ったよ。コード「"+roomCode+"」を相手に伝えて、入ってくるのを待ってね…");
+  try{
+    peer=new Peer(PEER_PREFIX+roomCode.toLowerCase());
+  }catch(e){ setLobbyStatus(peerErrorMessage(e)); return; }
+  peer.on('open',function(){ setLobbyStatus("部屋「"+roomCode+"」で待機中… 相手がコードを入力すると対戦が始まります。"); });
+  peer.on('connection',function(c){
+    if(conn && conn.open){ try{ c.close(); }catch(e){} return; }
+    bindConn(c);
+  });
+  peer.on('error',function(err){ setLobbyStatus(peerErrorMessage(err)); });
+  peer.on('disconnected',function(){ setLobbyStatus("通信が切れました。ページを開いたまま、もう一度試してね。"); });
+}
+function joinRoom(){
+  if(typeof Peer==="undefined"){ setLobbyStatus("通信ライブラリを読み込めませんでした。ネット接続を確認してページを再読み込みしてね。"); return; }
+  var code=document.getElementById('joinCodeInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if(code.length!==6){ setLobbyStatus("コードは6文字で入力してね。"); return; }
+  cleanupPeer();
+  onlineConnected=false;
+  roomCode=code;
+  onlineRole='guest';
+  document.getElementById('roomCodeBox').hidden=true;
+  setLobbyStatus("部屋「"+code+"」に接続中…");
+  try{
+    peer=new Peer();
+  }catch(e){ setLobbyStatus(peerErrorMessage(e)); return; }
+  peer.on('open',function(){
+    var c=peer.connect(PEER_PREFIX+code.toLowerCase(), {reliable:true});
+    bindConn(c);
+  });
+  peer.on('error',function(err){
+    setLobbyStatus(peerErrorMessage(err));
+    if(onlineConnected) return;
+    onlineConnected=false;
+  });
+  peer.on('disconnected',function(){ if(!onlineConnected) setLobbyStatus("通信が切れました。もう一度試してね。"); });
+}
+document.getElementById('onlineBtn').addEventListener('click',function(){
+  if(onlineConnected){
+    sendMsg({type:'bye'});
+    onlineConnected=false;
+    cleanupPeer();
+    gameMode='cpu'; OPP_NAME="CPU";
+    myPickSent=null; remotePicks={};
+    newGame();
+    updateOnlineUI();
+    render();
+    document.getElementById('resultBox').innerHTML='<p class="big">📴 オンライン対戦をやめて、CPU対戦に戻りました。</p>';
+  }else{
+    openOnlineModal();
+  }
+});
+document.getElementById('onlineClose').addEventListener('click',closeOnlineModal);
+document.getElementById('onlineBackdrop').addEventListener('click',closeOnlineModal);
+document.getElementById('createRoomBtn').addEventListener('click',createRoom);
+document.getElementById('joinRoomBtn').addEventListener('click',joinRoom);
+document.getElementById('joinCodeInput').addEventListener('keydown',function(e){ if(e.key==='Enter') joinRoom(); });
+document.getElementById('copyRoomBtn').addEventListener('click',function(){
+  var code=document.getElementById('roomCodeText').textContent;
+  var btn=this;
+  function done(){ btn.textContent="コピーした！ ✓"; setTimeout(function(){ btn.textContent="コードをコピー"; },1600); }
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(done, done); }
+  else { done(); }
+});
+
+renderDiff();
+newGame();
+</script>
+</body>
+</html>
