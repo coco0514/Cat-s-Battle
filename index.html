@@ -454,7 +454,7 @@ body.is-animating .hand button,body.is-animating .diffbtn,body.is-animating .sma
   </div>
 
   <div class="lobby-status" id="lobbyStatus" role="status"></div>
-  <p class="lobby-note">※ 対戦中はこのページを開いたままにしてください。閉じる・リロードすると切断されます。つながらない時は、コードの打ち間違いと、相手が部屋を作ったまま待っているかを確認してみてください。通信は端末同士の直接接続（WebRTC）で、対戦データがサーバーに保存されることはありません。</p>
+  <p class="lobby-note">※ 対戦中はこのページを開いたままにしてください。閉じる・リロードすると切断されます。つながらない時は、コードの打ち間違いと、相手が部屋を作ったまま待っているかを確認してみてください。通信は端末同士の直接接続（WebRTC）が基本で、スマホ回線など直接つながりにくい組み合わせでは公開の中継サーバー（TURN）を経由します。中継サーバーに対戦データが保存されることはありません。接続には最大30秒ほどかかることがあります。</p>
 </div>
 
 <!-- ルール画面 -->
@@ -1152,6 +1152,28 @@ document.querySelectorAll('.diffbtn').forEach(function(b){
 });
 /* ============ オンライン対戦（PeerJS / WebRTC・端末同士の直接接続） ============ */
 var PEER_PREFIX="nekonokenka-v1-";
+/* ICEサーバー設定。PeerJS標準の無料TURNは終了していてSTUNだけでは
+   スマホ回線×PC回線などの組み合わせでNAT越えに失敗するため、
+   Open Relay Project（metered.ca）の公開TURNリレーを中継候補に追加する。
+   TURNは通信を中継するだけで、対戦データは保存されない。 */
+var ICE_SERVERS=[
+  {urls:"stun:stun.l.google.com:19302"},
+  {urls:"stun:stun1.l.google.com:19302"},
+  {urls:"stun:stun.cloudflare.com:3478"},
+  {urls:["turn:eu-0.turn.peerjs.com:3478","turn:us-0.turn.peerjs.com:3478"],username:"peerjs",credential:"peerjsp"},
+  {urls:"turn:openrelay.metered.ca:80",username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turns:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"}
+];
+var PEER_OPTS={config:{iceServers:ICE_SERVERS},debug:0};
+/* 接続試行の世代カウンタとタイマー。古い試行のイベント・タイマーが
+   新しい試行に干渉しないようにするためのもの */
+var peerGen=0, brokerTimer=null, connTimer=null;
+function clearPeerTimers(){
+  if(brokerTimer){ clearTimeout(brokerTimer); brokerTimer=null; }
+  if(connTimer){ clearTimeout(connTimer); connTimer=null; }
+}
 function setLobbyStatus(t){ document.getElementById('lobbyStatus').textContent=t; }
 function openOnlineModal(){
   document.getElementById('onlineModal').hidden=false;
@@ -1268,6 +1290,8 @@ function onOnlinePeerGone(reason){
   document.getElementById('phaseLabel').textContent="CPU対戦に戻りました";
 }
 function cleanupPeer(){
+  peerGen++;
+  clearPeerTimers();
   try{ if(conn) conn.close(); }catch(e){}
   try{ if(peer) peer.destroy(); }catch(e){}
   conn=null; peer=null; onlineRole=null;
@@ -1278,13 +1302,38 @@ function peerErrorMessage(err){
   if(t==='unavailable-id') return "そのコードは今使われています。もう一度「部屋を作る」を押してね。";
   if(t==='network' || t==='server-error') return "通信サーバーにつながりませんでした。ネット接続を確認して、少し待ってからもう一度試してね。";
   if(t==='browser-incompatible') return "このブラウザはオンライン対戦（WebRTC）に対応していません。";
+  if(t==='negotiation-failed') return "相手と回線がつながりませんでした（NAT越えに失敗）。両方ともいったん切断して、部屋を作り直してもう一度試してみてね。Wi-Fiとモバイル回線の組み合わせを変えるとつながることもあります。";
   return "接続でエラーが起きました（"+(t||'不明')+"）。もう一度試してね。";
 }
 function bindConn(c){
   conn=c;
+  var gen=peerGen;
+  var opened=false;
+  var role=onlineRole;
+  /* 接続が開く前に失敗・タイムアウトしたら、無言で固まらず理由を表示して
+     やり直せる状態に戻す（ホストは部屋を残し、ゲストは接続を破棄する） */
+  function failPending(msg){
+    if(gen!==peerGen || opened) return;
+    if(connTimer){ clearTimeout(connTimer); connTimer=null; }
+    if(role==='host'){
+      try{ c.close(); }catch(e){}
+      if(conn===c) conn=null;
+      setLobbyStatus(msg+" 部屋「"+roomCode+"」はそのまま待機中です。相手にもう一度入ってもらってね。");
+    }else{
+      setLobbyStatus(msg);
+      cleanupPeer();
+      updateOnlineUI();
+    }
+  }
+  connTimer=setTimeout(function(){
+    failPending("30秒待っても相手とつながりませんでした。相手が部屋で待っているか、コードが合っているかを確認して、もう一度試してね。回線同士の相性でつながらない時は、Wi-Fi／モバイル回線の組み合わせを変えると改善することがあります。");
+  },30000);
   c.on('open',function(){
+    if(gen!==peerGen) return;
+    opened=true;
+    if(connTimer){ clearTimeout(connTimer); connTimer=null; }
     onlineConnected=true;
-    if(onlineRole==='host'){
+    if(role==='host'){
       setLobbyStatus("相手が入ってきた！ 対戦を始めます…");
       startHostedGame();
     }else{
@@ -1294,8 +1343,30 @@ function bindConn(c){
     updateOnlineUI();
   });
   c.on('data',handleOnlineData);
-  c.on('close',function(){ onOnlinePeerGone("相手との接続が切れました"); });
-  c.on('error',function(err){ setLobbyStatus(peerErrorMessage(err)); });
+  c.on('iceStateChanged',function(state){
+    if(gen!==peerGen || opened) return;
+    if(state==='failed'){
+      failPending("相手と回線がつながりませんでした（NAT越えに失敗）。");
+    }else if(state==='disconnected'){
+      setLobbyStatus("相手との回線が不安定です…つながるまでもう少し待ってね。");
+    }
+  });
+  c.on('close',function(){
+    if(gen!==peerGen) return;
+    if(!opened){
+      failPending("接続が閉じられてしまいました。相手が部屋で待っているか確認して、もう一度試してね。");
+      return;
+    }
+    onOnlinePeerGone("相手との接続が切れました");
+  });
+  c.on('error',function(err){
+    if(gen!==peerGen) return;
+    if(!opened && err && err.type==='negotiation-failed'){
+      failPending("相手と回線がつながりませんでした（NAT越えに失敗）。");
+      return;
+    }
+    setLobbyStatus(peerErrorMessage(err));
+  });
 }
 function createRoom(){
   if(typeof Peer==="undefined"){ setLobbyStatus("通信ライブラリを読み込めませんでした。ネット接続を確認してページを再読み込みしてね。"); return; }
@@ -1303,19 +1374,43 @@ function createRoom(){
   onlineConnected=false;
   roomCode=genRoomCode();
   onlineRole='host';
+  var gen=peerGen;
   document.getElementById('roomCodeText').textContent=roomCode;
-  document.getElementById('roomCodeBox').hidden=false;
-  setLobbyStatus("部屋を作ったよ。コード「"+roomCode+"」を相手に伝えて、入ってくるのを待ってね…");
+  document.getElementById('roomCodeBox').hidden=true;
+  setLobbyStatus("部屋を準備中…（通信サーバーに登録しています）");
   try{
-    peer=new Peer(PEER_PREFIX+roomCode.toLowerCase());
+    peer=new Peer(PEER_PREFIX+roomCode.toLowerCase(), PEER_OPTS);
   }catch(e){ setLobbyStatus(peerErrorMessage(e)); return; }
-  peer.on('open',function(){ setLobbyStatus("部屋「"+roomCode+"」で待機中… 相手がコードを入力すると対戦が始まります。"); });
+  brokerTimer=setTimeout(function(){
+    if(gen!==peerGen || !peer || peer.open) return;
+    document.getElementById('roomCodeBox').hidden=true;
+    setLobbyStatus("通信サーバーに登録できませんでした。ネット接続を確認して、もう一度「部屋を作る」を押してね。");
+    cleanupPeer();
+  },15000);
+  peer.on('open',function(){
+    if(gen!==peerGen) return;
+    if(brokerTimer){ clearTimeout(brokerTimer); brokerTimer=null; }
+    /* 登録が確認できてからコードを見せる（登録前のコードは相手が見つけられない） */
+    document.getElementById('roomCodeBox').hidden=false;
+    setLobbyStatus("部屋「"+roomCode+"」で待機中… 相手がコードを入力すると対戦が始まります。");
+  });
   peer.on('connection',function(c){
-    if(conn && conn.open){ try{ c.close(); }catch(e){} return; }
+    if(gen!==peerGen) return;
+    if(conn){ try{ c.close(); }catch(e){} return; }
     bindConn(c);
   });
-  peer.on('error',function(err){ setLobbyStatus(peerErrorMessage(err)); });
-  peer.on('disconnected',function(){ setLobbyStatus("通信が切れました。ページを開いたまま、もう一度試してね。"); });
+  peer.on('error',function(err){
+    if(gen!==peerGen) return;
+    if(err && err.type==='unavailable-id'){ document.getElementById('roomCodeBox').hidden=true; cleanupPeer(); }
+    setLobbyStatus(peerErrorMessage(err));
+  });
+  peer.on('disconnected',function(){
+    if(gen!==peerGen || onlineConnected) return;
+    /* サーバーとの接続だけ切れた場合は同じ部屋コードのまま再登録する。
+       再登録しないと、表示中のコードでは二度と相手が入ってこられない */
+    setLobbyStatus("通信サーバーとの接続が切れたので、再接続しています…");
+    try{ peer.reconnect(); }catch(e){ setLobbyStatus("再接続できませんでした。「部屋を作る」から作り直してね。"); }
+  });
 }
 function joinRoom(){
   if(typeof Peer==="undefined"){ setLobbyStatus("通信ライブラリを読み込めませんでした。ネット接続を確認してページを再読み込みしてね。"); return; }
@@ -1325,21 +1420,32 @@ function joinRoom(){
   onlineConnected=false;
   roomCode=code;
   onlineRole='guest';
+  var gen=peerGen;
   document.getElementById('roomCodeBox').hidden=true;
-  setLobbyStatus("部屋「"+code+"」に接続中…");
+  setLobbyStatus("部屋「"+code+"」に接続中…（通信サーバーに登録しています）");
   try{
-    peer=new Peer();
+    peer=new Peer(PEER_OPTS);
   }catch(e){ setLobbyStatus(peerErrorMessage(e)); return; }
+  brokerTimer=setTimeout(function(){
+    if(gen!==peerGen || !peer || peer.open) return;
+    setLobbyStatus("通信サーバーに登録できませんでした。ネット接続を確認して、もう一度試してね。");
+    cleanupPeer();
+  },15000);
   peer.on('open',function(){
+    if(gen!==peerGen) return;
+    if(brokerTimer){ clearTimeout(brokerTimer); brokerTimer=null; }
+    setLobbyStatus("部屋「"+code+"」を探して、相手との回線をつないでいます…（つながりにくい回線だと中継サーバー経由で少し時間がかかります）");
     var c=peer.connect(PEER_PREFIX+code.toLowerCase(), {reliable:true});
     bindConn(c);
   });
   peer.on('error',function(err){
+    if(gen!==peerGen) return;
     setLobbyStatus(peerErrorMessage(err));
     if(onlineConnected) return;
+    if(err && err.type==='peer-unavailable'){ cleanupPeer(); }
     onlineConnected=false;
   });
-  peer.on('disconnected',function(){ if(!onlineConnected) setLobbyStatus("通信が切れました。もう一度試してね。"); });
+  peer.on('disconnected',function(){ if(gen===peerGen && !onlineConnected) setLobbyStatus("通信が切れました。もう一度試してね。"); });
 }
 document.getElementById('onlineBtn').addEventListener('click',function(){
   if(onlineConnected){
